@@ -78,6 +78,7 @@ class MetricTile extends StatelessWidget {
   final String? trendLabel;
   @override
   Widget build(BuildContext context) => AppSurface(
+    padding: const EdgeInsets.all(AppSpacing.xs),
     shadows: const [],
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,7 +97,7 @@ class MetricTile extends StatelessWidget {
             if (trendLabel case final value?) StatusBadge(label: value),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xxs),
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.labelMedium,
@@ -173,8 +174,12 @@ class MatchScoreCard extends StatelessWidget {
           children: [
             const Icon(Icons.auto_awesome, color: AppColors.primary),
             const SizedBox(width: AppSpacing.xs),
-            Text(label, style: Theme.of(context).textTheme.titleMedium),
-            const Spacer(),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
             Text('$score%', style: Theme.of(context).textTheme.titleLarge),
           ],
         ),
