@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local backend environment configuration
+/hunter-backend/.env
+
 # Symbolication related
 app.*.symbols
 

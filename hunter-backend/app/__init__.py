@@ -1,0 +1,1 @@
+"""Hunter backend application package."""
