@@ -8,6 +8,9 @@ from app.models.user import User
 from app.models.match import JobMatch
 from app.schemas.match import JobMatchRead, JobMatchRequest
 from app.services.job_matcher import JobMatcher
+from app.services.ai import get_ai_provider
+from app.services.ai.job_resume_analyzer import JobResumeAnalyzer
+from app.services.ai.schemas import AIAnalysisResponse
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -60,3 +63,32 @@ def get_match(
     if match_record.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
     return match_record
+
+
+@router.post("/jobs/{job_id}/analyze", response_model=AIAnalysisResponse)
+def analyze_match(
+    job_id: str,
+    payload: JobMatchRequest,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+    ai_provider = Depends(get_ai_provider)
+) -> AIAnalysisResponse:
+    analyzer = JobResumeAnalyzer(database, ai_provider)
+    try:
+        result = analyzer.analyze(
+            user_id=current_user.id,
+            resume_id=payload.resume_id,
+            job_id=job_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Note: In a real app we might want to distinguish between 4xx and 5xx here
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI Analysis failed: {str(e)}"
+        )

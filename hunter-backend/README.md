@@ -33,14 +33,16 @@ Local file system storage is utilized for development-only purposes. Production 
 - **First-Resume Assignment**: The first uploaded document automatically locks into `is_primary = true`. Subsequent uploads default to `false` unless explicitly overridden.
 - **Primary Flipping Strategy**: Flipping a specific document to primary sweeps existing primary markers for that authenticated user context to `false`.
 
-## AI Foundation (Phase 3E.3.1)
+## AI Foundation (Phase 3E.3.1 & 3E.3.2)
 
-A provider-agnostic abstraction layer for future AI-driven features (analysis, tailoring).
+A provider-agnostic abstraction layer for AI-driven features.
 - **Abstraction**: `AIProvider` interface defines contracts for analysis and tailoring.
-- **Factory**: `get_ai_provider()` handles instantiation based on configuration.
-- **Mocking**: `MockAIProvider` provides deterministic responses for testing without API keys or costs.
-- **Configuration**: Managed via `AI_PROVIDER`, `AI_API_KEY`, and `AI_MODEL` environment variables.
-- **Current Status**: Foundation only. Actual AI matching/tailoring is pending Phase 3E.3.2.
+- **Implementations**:
+  - `MockAIProvider`: Deterministic responses for testing/offline dev.
+  - `OpenAIProvider`: Real-world analysis using GPT models.
+- **AI Analysis**: `POST /matches/jobs/{job_id}/analyze` performs a deep comparison between a job and a resume, identifying strengths, missing skills, and providing recommendations.
+- **Configuration**: Managed via `AI_PROVIDER` (`mock` or `openai`), `AI_API_KEY`, and `AI_MODEL` (e.g., `gpt-4o-mini`).
+- **Privacy**: Only necessary resume/job text is sent to the provider. No PII or credentials are leaked.
 
 ## Endpoints
 
@@ -58,6 +60,7 @@ A provider-agnostic abstraction layer for future AI-driven features (analysis, t
 - `PUT /resumes/{resume_id}` — Safely swap file contents and refresh filename indices
 - `DELETE /resumes/{resume_id}` — Clean metadata logs and delete files from the disk
 - `PATCH /resumes/{resume_id}/primary` — Update the primary active target for that user
+- `POST /matches/jobs/{job_id}/analyze` — AI-powered job/resume analysis
 
 Run the mock ingestion after starting the API:
 
