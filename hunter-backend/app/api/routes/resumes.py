@@ -12,6 +12,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.resume import Resume
 from app.schemas.resume import ResumeRead, ResumeUpdate
+from app.services.resume_extractor import extract_text_from_file, ResumeExtractionError
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -76,6 +77,15 @@ def upload_resume(
     with open(safe_path, "wb") as f:
         f.write(content)
 
+    # Perform text extraction
+    try:
+        extracted_text = extract_text_from_file(safe_path, ext)
+    except ResumeExtractionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
     # Primary logic if this is first
     is_primary = True if is_first else False
 
@@ -84,7 +94,7 @@ def upload_resume(
         user_id=current_user.id,
         filename=filename,
         file_url=safe_filename,  # relative filename or reference
-        content_text=None,
+        content_text=extracted_text,
         is_primary=is_primary
     )
     database.add(new_resume)
@@ -178,6 +188,27 @@ def update_resume(
             detail=f"File size exceeds the limit of {settings.max_resume_file_size} bytes."
         )
 
+    # Save new file first to make sure it's valid
+    safe_filename = f"{uuid.uuid4()}{ext}"
+    safe_path = os.path.join(get_safe_upload_dir(), safe_filename)
+    with open(safe_path, "wb") as f:
+        f.write(content)
+
+    # Perform text extraction
+    try:
+        extracted_text = extract_text_from_file(safe_path, ext)
+    except ResumeExtractionError as e:
+        # Clean up the newly uploaded file before failing if extraction fails
+        if os.path.exists(safe_path):
+            try:
+                os.remove(safe_path)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
     # Remove old file if it exists
     old_path = os.path.join(settings.resume_upload_dir, resume.file_url)
     if os.path.exists(old_path):
@@ -186,14 +217,9 @@ def update_resume(
         except Exception:
             pass
 
-    # Save new file
-    safe_filename = f"{uuid.uuid4()}{ext}"
-    safe_path = os.path.join(get_safe_upload_dir(), safe_filename)
-    with open(safe_path, "wb") as f:
-        f.write(content)
-
     resume.filename = filename
     resume.file_url = safe_filename
+    resume.content_text = extracted_text
     database.commit()
     database.refresh(resume)
     return resume
@@ -241,6 +267,37 @@ def set_primary_resume(
     )
 
     resume.is_primary = True
+    database.commit()
+    database.refresh(resume)
+    return resume
+
+
+@router.post("/{resume_id}/extract", response_model=ResumeRead)
+def reextract_resume(
+    resume_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db)
+) -> Resume:
+    resume = database.scalar(select(Resume).where(Resume.id == resume_id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+    if resume.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    safe_path = os.path.join(settings.resume_upload_dir, resume.file_url)
+    if not os.path.exists(safe_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Physical file not found on disk.")
+
+    ext = os.path.splitext(resume.filename)[1].lower()
+    try:
+        extracted_text = extract_text_from_file(safe_path, ext)
+    except ResumeExtractionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+    resume.content_text = extracted_text
     database.commit()
     database.refresh(resume)
     return resume

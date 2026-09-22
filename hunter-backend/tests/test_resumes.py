@@ -11,6 +11,11 @@ def setup_test_upload_dir(monkeypatch, tmp_path):
     # Isolated test storage directory
     test_upload_dir = tmp_path / "test_uploads"
     monkeypatch.setattr(settings, "resume_upload_dir", str(test_upload_dir))
+
+    # Mock text extraction to let dummy non-PDF bytes pass through in these metadata tests
+    import app.api.routes.resumes
+    monkeypatch.setattr(app.api.routes.resumes, "extract_text_from_file", lambda path, ext: "Extracted mock text content")
+
     return test_upload_dir
 
 
