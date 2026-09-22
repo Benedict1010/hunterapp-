@@ -4,12 +4,14 @@ from app.api.routes.jobs import router as jobs_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.users import router as users_router
 from app.api.routes.resumes import router as resumes_router
+from app.api.routes.matches import router as matches_router
 
 app = FastAPI(title="Hunter API")
 app.include_router(jobs_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(resumes_router)
+app.include_router(matches_router)
 
 
 @app.get("/health")

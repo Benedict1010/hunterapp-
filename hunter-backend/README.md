@@ -33,6 +33,15 @@ Local file system storage is utilized for development-only purposes. Production 
 - **First-Resume Assignment**: The first uploaded document automatically locks into `is_primary = true`. Subsequent uploads default to `false` unless explicitly overridden.
 - **Primary Flipping Strategy**: Flipping a specific document to primary sweeps existing primary markers for that authenticated user context to `false`.
 
+## AI Foundation (Phase 3E.3.1)
+
+A provider-agnostic abstraction layer for future AI-driven features (analysis, tailoring).
+- **Abstraction**: `AIProvider` interface defines contracts for analysis and tailoring.
+- **Factory**: `get_ai_provider()` handles instantiation based on configuration.
+- **Mocking**: `MockAIProvider` provides deterministic responses for testing without API keys or costs.
+- **Configuration**: Managed via `AI_PROVIDER`, `AI_API_KEY`, and `AI_MODEL` environment variables.
+- **Current Status**: Foundation only. Actual AI matching/tailoring is pending Phase 3E.3.2.
+
 ## Endpoints
 
 - `GET /health`

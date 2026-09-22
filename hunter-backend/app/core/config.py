@@ -14,5 +14,9 @@ class Settings:
     resume_upload_dir = os.getenv("RESUME_UPLOAD_DIR", "uploads/resumes")
     max_resume_file_size = int(os.getenv("MAX_RESUME_FILE_SIZE", str(5 * 1024 * 1024))) # 5 MB default
 
+    ai_provider = os.getenv("AI_PROVIDER", "mock")
+    ai_api_key = os.getenv("AI_API_KEY", "")
+    ai_model = os.getenv("AI_MODEL", "gpt-4o-mini")
+
 
 settings = Settings()
