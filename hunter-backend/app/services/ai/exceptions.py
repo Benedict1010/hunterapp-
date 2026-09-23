@@ -14,6 +14,10 @@ class AIResponseError(AIError):
     """Raised when the AI provider returns an invalid or malformed response."""
     pass
 
+class AITailoringValidationError(AIResponseError):
+    """Raised when tailored resume output fails anti-fabrication safety validation."""
+    pass
+
 class AIRateLimitError(AIError):
     """Raised when the provider's rate limit is hit."""
     pass

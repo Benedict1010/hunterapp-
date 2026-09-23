@@ -10,7 +10,9 @@ from app.schemas.match import JobMatchRead, JobMatchRequest
 from app.services.job_matcher import JobMatcher
 from app.services.ai import get_ai_provider
 from app.services.ai.job_resume_analyzer import JobResumeAnalyzer
-from app.services.ai.schemas import AIAnalysisResponse
+from app.services.ai.resume_tailor import ResumeTailor
+from app.services.ai.schemas import AIAnalysisResponse, AITailoringResponse
+from app.services.ai.exceptions import AIError, AITailoringValidationError
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -91,4 +93,42 @@ def analyze_match(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI Analysis failed: {str(e)}"
+        )
+
+
+@router.post("/jobs/{job_id}/tailor", response_model=AITailoringResponse)
+def tailor_resume(
+    job_id: str,
+    payload: JobMatchRequest,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+    ai_provider = Depends(get_ai_provider)
+) -> AITailoringResponse:
+    tailorer = ResumeTailor(database, ai_provider)
+    try:
+        result = tailorer.tailor(
+            user_id=current_user.id,
+            resume_id=payload.resume_id,
+            job_id=job_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except AITailoringValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"AI Tailoring safety validation failed: {str(e)}"
+        )
+    except AIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI Provider error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI Tailoring failed: {str(e)}"
         )

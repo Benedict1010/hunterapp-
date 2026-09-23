@@ -33,14 +33,21 @@ Local file system storage is utilized for development-only purposes. Production 
 - **First-Resume Assignment**: The first uploaded document automatically locks into `is_primary = true`. Subsequent uploads default to `false` unless explicitly overridden.
 - **Primary Flipping Strategy**: Flipping a specific document to primary sweeps existing primary markers for that authenticated user context to `false`.
 
-## AI Foundation (Phase 3E.3.1 & 3E.3.2)
+## AI Foundation & Tailoring (Phase 3E.3.1, 3E.3.2 & 3E.3.3)
 
 A provider-agnostic abstraction layer for AI-driven features.
 - **Abstraction**: `AIProvider` interface defines contracts for analysis and tailoring.
 - **Implementations**:
   - `MockAIProvider`: Deterministic responses for testing/offline dev.
-  - `OpenAIProvider`: Real-world analysis using GPT models.
+  - `OpenAIProvider`: Real-world analysis and tailoring using GPT models.
 - **AI Analysis**: `POST /matches/jobs/{job_id}/analyze` performs a deep comparison between a job and a resume, identifying strengths, missing skills, and providing recommendations.
+- **AI Tailoring**: `POST /matches/jobs/{job_id}/tailor` generates a job-aligned tailored resume without modifying the original resume.
+- **Anti-Fabrication Safeguards**:
+  - Strict system prompt rules instruct models never to fabricate employment, dates, metrics, credentials, or unsupported skills.
+  - Post-generation deterministic safety validator checks for newly introduced numbers/metrics, unsupported target job skills, and dates.
+  - Rejects unsafe/fabricated responses with HTTP 422 `AITailoringValidationError`.
+- **Preservation & Non-Persistence**: `Resume.content_text` is never overwritten. Tailored output is returned transiently in the response payload. Persistent versioning is deferred to future phases.
+- **Safety Validation Limitations**: Deterministic validation verifies explicit additions of unsupported numbers, dates, credentials, and target job skills. It does not perform deep semantic equivalence checks or catch subtle phrasing shifts that do not introduce explicit numbers or keywords.
 - **Configuration**: Managed via `AI_PROVIDER` (`mock` or `openai`), `AI_API_KEY`, and `AI_MODEL` (e.g., `gpt-4o-mini`).
 - **Privacy**: Only necessary resume/job text is sent to the provider. No PII or credentials are leaked.
 
@@ -61,6 +68,7 @@ A provider-agnostic abstraction layer for AI-driven features.
 - `DELETE /resumes/{resume_id}` — Clean metadata logs and delete files from the disk
 - `PATCH /resumes/{resume_id}/primary` — Update the primary active target for that user
 - `POST /matches/jobs/{job_id}/analyze` — AI-powered job/resume analysis
+- `POST /matches/jobs/{job_id}/tailor` — AI-assisted safe resume tailoring
 
 Run the mock ingestion after starting the API:
 
