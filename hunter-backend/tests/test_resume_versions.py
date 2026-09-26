@@ -19,12 +19,13 @@ def create_auth_header(client, email="version_user@example.com"):
 
 
 # 1. Original version creation after successful resume upload/extraction
-def test_original_version_created_on_upload(client, database):
+@patch("app.api.routes.resumes.extract_text_from_file", return_value="Extracted mock text content")
+def test_original_version_created_on_upload(mock_extract, client, database):
     headers = create_auth_header(client, "upload_user@example.com")
     res = client.post(
         "/resumes",
         headers=headers,
-        files={"file": ("my_resume.pdf", b"valid pdf content", "application/pdf")}
+        files={"file": ("my_resume.pdf", b"%PDF-1.4 mock content", "application/pdf")}
     )
     assert res.status_code == 201
     resume_data = res.json()
@@ -60,19 +61,20 @@ def test_no_original_version_on_failed_extraction(mock_extract, client, database
 
 
 # 3. Resume replacement behavior
-def test_resume_replacement_creates_new_original_version(client, database):
+@patch("app.api.routes.resumes.extract_text_from_file", return_value="Extracted mock text content")
+def test_resume_replacement_creates_new_original_version(mock_extract, client, database):
     headers = create_auth_header(client, "replace_user@example.com")
     res1 = client.post(
         "/resumes",
         headers=headers,
-        files={"file": ("v1.pdf", b"v1 content", "application/pdf")}
+        files={"file": ("v1.pdf", b"%PDF-1.4 v1 content", "application/pdf")}
     )
     resume_id = res1.json()["id"]
 
     res2 = client.put(
         f"/resumes/{resume_id}",
         headers=headers,
-        files={"file": ("v2.pdf", b"v2 content", "application/pdf")}
+        files={"file": ("v2.pdf", b"%PDF-1.4 v2 content", "application/pdf")}
     )
     assert res2.status_code == 200
 

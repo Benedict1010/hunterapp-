@@ -10,8 +10,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.resume import Resume
-from app.schemas.resume import ResumeRead, ResumeUpdate
+from app.models.resume import Resume, ResumeVersion, ResumeVersionType
+from app.schemas.resume import ResumeRead, ResumeUpdate, ResumeVersionRead
 from app.services.resume_extractor import extract_text_from_file, ResumeExtractionError
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -98,6 +98,18 @@ def upload_resume(
         is_primary=is_primary
     )
     database.add(new_resume)
+    database.flush()
+
+    if extracted_text and extracted_text.strip():
+        original_version = ResumeVersion(
+            resume_id=new_resume.id,
+            user_id=current_user.id,
+            job_id=None,
+            version_type=ResumeVersionType.ORIGINAL.value,
+            content_text=extracted_text,
+        )
+        database.add(original_version)
+
     database.commit()
     database.refresh(new_resume)
     return new_resume
@@ -220,9 +232,67 @@ def update_resume(
     resume.filename = filename
     resume.file_url = safe_filename
     resume.content_text = extracted_text
+
+    if extracted_text and extracted_text.strip():
+        original_version = ResumeVersion(
+            resume_id=resume.id,
+            user_id=current_user.id,
+            job_id=None,
+            version_type=ResumeVersionType.ORIGINAL.value,
+            content_text=extracted_text,
+        )
+        database.add(original_version)
+
     database.commit()
     database.refresh(resume)
     return resume
+
+
+@router.get("/{resume_id}/versions", response_model=list[ResumeVersionRead])
+def list_resume_versions(
+    resume_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db)
+) -> list[ResumeVersion]:
+    resume = database.scalar(select(Resume).where(Resume.id == resume_id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+    if resume.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    statement = (
+        select(ResumeVersion)
+        .where(ResumeVersion.resume_id == resume_id, ResumeVersion.user_id == current_user.id)
+        .order_by(ResumeVersion.created_at.desc())
+    )
+    return list(database.scalars(statement).all())
+
+
+@router.get("/{resume_id}/versions/{version_id}", response_model=ResumeVersionRead)
+def get_resume_version(
+    resume_id: str,
+    version_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db)
+) -> ResumeVersion:
+    resume = database.scalar(select(Resume).where(Resume.id == resume_id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+    if resume.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    version = database.scalar(
+        select(ResumeVersion).where(
+            ResumeVersion.id == version_id,
+            ResumeVersion.resume_id == resume_id,
+            ResumeVersion.user_id == current_user.id,
+        )
+    )
+    if not version:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume version not found.")
+
+    return version
+
 
 
 @router.delete("/{resume_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -298,6 +368,64 @@ def reextract_resume(
         )
 
     resume.content_text = extracted_text
+
+    if extracted_text and extracted_text.strip():
+        original_version = ResumeVersion(
+            resume_id=resume.id,
+            user_id=current_user.id,
+            job_id=None,
+            version_type=ResumeVersionType.ORIGINAL.value,
+            content_text=extracted_text,
+        )
+        database.add(original_version)
+
     database.commit()
     database.refresh(resume)
     return resume
+
+
+@router.get("/{resume_id}/versions", response_model=list[ResumeVersionRead])
+def list_resume_versions(
+    resume_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db)
+) -> list[ResumeVersion]:
+    resume = database.scalar(select(Resume).where(Resume.id == resume_id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+    if resume.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    statement = (
+        select(ResumeVersion)
+        .where(ResumeVersion.resume_id == resume_id, ResumeVersion.user_id == current_user.id)
+        .order_by(ResumeVersion.created_at.desc())
+    )
+    return list(database.scalars(statement).all())
+
+
+@router.get("/{resume_id}/versions/{version_id}", response_model=ResumeVersionRead)
+def get_resume_version(
+    resume_id: str,
+    version_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db)
+) -> ResumeVersion:
+    resume = database.scalar(select(Resume).where(Resume.id == resume_id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found.")
+    if resume.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    version = database.scalar(
+        select(ResumeVersion).where(
+            ResumeVersion.id == version_id,
+            ResumeVersion.resume_id == resume_id,
+            ResumeVersion.user_id == current_user.id,
+        )
+    )
+    if not version:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume version not found.")
+
+    return version
+

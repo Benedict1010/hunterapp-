@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.models.job import Job
-from app.models.resume import Resume
+from app.models.resume import Resume, ResumeVersion, ResumeVersionType
 from app.services.ai.base import AIProvider
 from app.services.ai.schemas import AITailoringRequest, AITailoringResponse
 from app.services.ai.exceptions import AITailoringValidationError
@@ -62,7 +62,25 @@ class ResumeTailor:
         # 6. Post-generation safety validation
         self.validate_safety(resume.content_text, job, response)
 
-        # 7. Return structured tailoring result
+        # 7. Persist tailored resume version
+        try:
+            version = ResumeVersion(
+                resume_id=resume_id,
+                user_id=user_id,
+                job_id=job_id,
+                version_type=ResumeVersionType.TAILORED.value,
+                content_text=response.tailored_resume,
+                changes_made=response.changes_made,
+                warnings=response.warnings,
+            )
+            self.db.add(version)
+            self.db.commit()
+            self.db.refresh(version)
+        except Exception as e:
+            self.db.rollback()
+            raise e
+
+        # 8. Return structured tailoring result
         return response
 
     @staticmethod
