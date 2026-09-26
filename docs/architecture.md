@@ -196,9 +196,14 @@ hunter-backend/
 ### ResumeVersion
 - `id`: UUID
 - `resume_id`: FK(Resume)
-- `job_id`: FK(Job)
-- `modified_content`: Text
-- `file_url`: String
+- `user_id`: FK(User)
+- `job_id`: FK(Job, Nullable)
+- `version_type`: String ("original" | "tailored")
+- `content_text`: Text
+- `changes_made`: JSON (List[String], Nullable)
+- `warnings`: JSON (List[String], Nullable)
+- `created_at`: DateTime
+- `updated_at`: DateTime
 
 ### Job
 - `id`: UUID
