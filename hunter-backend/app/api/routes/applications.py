@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.application import Application, ApplicationStatus
+from app.models.application_timeline import ApplicationTimeline
 from app.models.job import Job
 from app.models.resume import ResumeVersion
 from app.models.user import User
 from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationUpdate
+from app.schemas.application_timeline import ApplicationTimelineCreate, ApplicationTimelineRead
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -48,21 +50,36 @@ def create_application(
         else ApplicationStatus.APPLIED.value
     )
     applied_at_val = payload.applied_at or datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
 
-    application = Application(
-        user_id=current_user.id,
-        job_id=payload.job_id,
-        resume_version_id=payload.resume_version_id,
-        status=status_val,
-        application_url=payload.application_url,
-        source=payload.source,
-        applied_at=applied_at_val,
-    )
+    try:
+        application = Application(
+            user_id=current_user.id,
+            job_id=payload.job_id,
+            resume_version_id=payload.resume_version_id,
+            status=status_val,
+            application_url=payload.application_url,
+            source=payload.source,
+            applied_at=applied_at_val,
+        )
 
-    database.add(application)
-    database.commit()
-    database.refresh(application)
-    return application
+        database.add(application)
+        database.flush()
+
+        initial_timeline = ApplicationTimeline(
+            application_id=application.id,
+            status=status_val,
+            note="Application created",
+            created_at=now,
+        )
+        database.add(initial_timeline)
+
+        database.commit()
+        database.refresh(application)
+        return application
+    except Exception:
+        database.rollback()
+        raise
 
 
 @router.get("", response_model=list[ApplicationRead])
@@ -125,6 +142,16 @@ def update_application(
             detail="Access denied.",
         )
 
+    new_status_val = None
+    if payload.status is not None:
+        status_str = (
+            payload.status.value
+            if isinstance(payload.status, ApplicationStatus)
+            else str(payload.status)
+        )
+        if status_str != application.status:
+            new_status_val = status_str
+
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field == "status" and value is not None:
@@ -138,6 +165,126 @@ def update_application(
         elif field == "applied_at":
             application.applied_at = value
 
-    database.commit()
-    database.refresh(application)
-    return application
+    now = datetime.now(timezone.utc)
+    try:
+        if new_status_val is not None:
+            timeline_event = ApplicationTimeline(
+                application_id=application.id,
+                status=new_status_val,
+                note=f"Status updated to {new_status_val}",
+                created_at=now,
+            )
+            database.add(timeline_event)
+
+        database.commit()
+        database.refresh(application)
+        return application
+    except Exception:
+        database.rollback()
+        raise
+
+
+@router.post("/{application_id}/timeline", response_model=ApplicationTimelineRead, status_code=status.HTTP_201_CREATED)
+def create_timeline_event(
+    application_id: str,
+    payload: ApplicationTimelineCreate,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> ApplicationTimeline:
+    application = database.scalar(
+        select(Application).where(Application.id == application_id)
+    )
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found.",
+        )
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+
+    status_val = payload.status.value
+    now = datetime.now(timezone.utc)
+
+    try:
+        timeline_event = ApplicationTimeline(
+            application_id=application.id,
+            status=status_val,
+            note=payload.note,
+            created_at=now,
+        )
+        database.add(timeline_event)
+        application.status = status_val
+
+        database.commit()
+        database.refresh(timeline_event)
+        return timeline_event
+    except Exception:
+        database.rollback()
+        raise
+
+
+@router.get("/{application_id}/timeline", response_model=list[ApplicationTimelineRead])
+def list_timeline_events(
+    application_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> list[ApplicationTimeline]:
+    application = database.scalar(
+        select(Application).where(Application.id == application_id)
+    )
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found.",
+        )
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+
+    statement = (
+        select(ApplicationTimeline)
+        .where(ApplicationTimeline.application_id == application_id)
+        .order_by(ApplicationTimeline.created_at.desc())
+    )
+    return list(database.scalars(statement).all())
+
+
+@router.get("/{application_id}/timeline/{timeline_id}", response_model=ApplicationTimelineRead)
+def get_timeline_event(
+    application_id: str,
+    timeline_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> ApplicationTimeline:
+    application = database.scalar(
+        select(Application).where(Application.id == application_id)
+    )
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found.",
+        )
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+
+    timeline_event = database.scalar(
+        select(ApplicationTimeline).where(
+            ApplicationTimeline.id == timeline_id,
+            ApplicationTimeline.application_id == application_id,
+        )
+    )
+    if not timeline_event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Timeline event not found.",
+        )
+
+    return timeline_event
