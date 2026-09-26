@@ -20,7 +20,7 @@ The `ResumeVersion` entity represents a concrete snapshot of a resume. Each `Res
 - `GET /resumes/{resume_id}/versions`: Returns all versions for a resume owned by the current user (newest first).
 - `GET /resumes/{resume_id}/versions/{version_id}`: Returns a single version snapshot owned by the current user.
 
-## Application Tracking Foundation (Phase 3F.1)
+## Application Tracking & Timeline (Phase 3F.1 & 3F.2)
 
 ### Application Model & ResumeVersion Link
 An `Application` represents a user's application to a specific job and captures the exact `ResumeVersion` used for that application.
@@ -34,14 +34,27 @@ User
  │
  └── Application
        ├── Job
-       └── ResumeVersion
+       ├── ResumeVersion
+       └── ApplicationTimeline (History)
 ```
 
-#### Application Endpoints
-- `POST /applications`: Creates an application linked to `job_id` and `resume_version_id` owned by the user.
-- `GET /applications`: Lists applications belonging to the authenticated user with optional `status` filtering (e.g., `applied`, `viewed`, `interview`, `offer`, `rejected`, `withdrawn`).
+### Current Status vs Application Timeline
+- **`Application.status`**: Represents the current state of an application.
+- **`ApplicationTimeline`**: Append-only historical event log capturing every state transition (`applied`, `viewed`, `interview`, `offer`, `rejected`, `withdrawn`).
+
+#### Automatic Initial Event & Status Transitions
+- Creating an application (`POST /applications`) automatically creates an initial `ApplicationTimeline` event (defaulting to `applied` or the supplied initial status) within the same database transaction.
+- Updating an application's status via `PATCH /applications/{application_id}` or adding a timeline event via `POST /applications/{application_id}/timeline` records a new historical event and updates `Application.status` transactionally.
+- Updating metadata-only fields (`application_url`, `source`, `applied_at`) or resubmitting the existing status does not generate duplicate timeline events.
+
+#### Application & Timeline Endpoints
+- `POST /applications`: Creates an application linked to `job_id` and `resume_version_id` owned by the user, creating an initial timeline event.
+- `GET /applications`: Lists applications belonging to the authenticated user with optional `status` filtering.
 - `GET /applications/{application_id}`: Fetches application detail for the owner.
-- `PATCH /applications/{application_id}`: Updates mutable metadata (`status`, `application_url`, `source`, `applied_at`). The `resume_version_id`, `job_id`, and `user_id` remain strictly immutable.
+- `PATCH /applications/{application_id}`: Updates mutable metadata. Status changes generate timeline history.
+- `POST /applications/{application_id}/timeline`: Adds a new timeline event and updates `Application.status`.
+- `GET /applications/{application_id}/timeline`: Lists timeline events newest-first.
+- `GET /applications/{application_id}/timeline/{timeline_id}`: Retrieves a single timeline event (with IDOR protection).
 
 #### Limitations & Future Enhancements
 - **Current Limitation**: Versions store structured plain text (`content_text`).

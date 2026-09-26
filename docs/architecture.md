@@ -254,11 +254,12 @@ hunter-backend/
 - `updated_at`: DateTime(timezone=True)
 
 ### ApplicationTimeline
-- `id`: UUID
-- `application_id`: FK(Application)
-- `status`: Enum
-- `notes`: Text
-- `created_at`: DateTime
+- `id`: UUID / String(36)
+- `application_id`: FK(Application, ON DELETE CASCADE)
+- `status`: Enum String (`applied`, `viewed`, `interview`, `offer`, `rejected`, `withdrawn`)
+- `note`: Text (Nullable)
+- `created_at`: DateTime(timezone=True)
+- `updated_at`: DateTime(timezone=True)
 
 ### Notification
 - `id`: UUID
