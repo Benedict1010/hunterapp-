@@ -20,6 +20,29 @@ The `ResumeVersion` entity represents a concrete snapshot of a resume. Each `Res
 - `GET /resumes/{resume_id}/versions`: Returns all versions for a resume owned by the current user (newest first).
 - `GET /resumes/{resume_id}/versions/{version_id}`: Returns a single version snapshot owned by the current user.
 
+## Application Tracking Foundation (Phase 3F.1)
+
+### Application Model & ResumeVersion Link
+An `Application` represents a user's application to a specific job and captures the exact `ResumeVersion` used for that application.
+
+#### Core Relationship
+```text
+User
+ ├── Job
+ ├── Resume
+ │    └── ResumeVersion
+ │
+ └── Application
+       ├── Job
+       └── ResumeVersion
+```
+
+#### Application Endpoints
+- `POST /applications`: Creates an application linked to `job_id` and `resume_version_id` owned by the user.
+- `GET /applications`: Lists applications belonging to the authenticated user with optional `status` filtering (e.g., `applied`, `viewed`, `interview`, `offer`, `rejected`, `withdrawn`).
+- `GET /applications/{application_id}`: Fetches application detail for the owner.
+- `PATCH /applications/{application_id}`: Updates mutable metadata (`status`, `application_url`, `source`, `applied_at`). The `resume_version_id`, `job_id`, and `user_id` remain strictly immutable.
+
 #### Limitations & Future Enhancements
 - **Current Limitation**: Versions store structured plain text (`content_text`).
 - **Future Enhancement**: Rendering tailored text into downloadable PDF/DOCX files.

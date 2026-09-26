@@ -38,8 +38,12 @@ class Application(Base):
     user: Mapped["User"] = relationship()
     job: Mapped["Job"] = relationship()
     resume_version: Mapped["ResumeVersion"] = relationship()
+    timeline_events: Mapped[list["ApplicationTimeline"]] = relationship(
+        back_populates="application", cascade="all, delete-orphan", order_by="ApplicationTimeline.created_at.desc()"
+    )
 
 
 from app.models.user import User  # noqa: E402
 from app.models.job import Job  # noqa: E402
 from app.models.resume import ResumeVersion  # noqa: E402
+from app.models.application_timeline import ApplicationTimeline  # noqa: E402

@@ -242,12 +242,16 @@ hunter-backend/
 - `status`: Enum (New, Interested, Dismissed)
 
 ### Application
-- `id`: UUID
-- `user_id`: FK(User)
-- `job_id`: FK(Job)
-- `resume_version_id`: FK(ResumeVersion)
-- `status`: Enum (Applied, Interviewing, Offered, Rejected)
-- `applied_at`: DateTime
+- `id`: UUID / String(36)
+- `user_id`: FK(User, ON DELETE CASCADE)
+- `job_id`: FK(Job, ON DELETE CASCADE)
+- `resume_version_id`: FK(ResumeVersion, ON DELETE CASCADE)
+- `status`: Enum String (`applied`, `viewed`, `interview`, `offer`, `rejected`, `withdrawn`)
+- `application_url`: String(1000) (Nullable)
+- `source`: String(255) (Nullable)
+- `applied_at`: DateTime(timezone=True) (Nullable)
+- `created_at`: DateTime(timezone=True)
+- `updated_at`: DateTime(timezone=True)
 
 ### ApplicationTimeline
 - `id`: UUID
