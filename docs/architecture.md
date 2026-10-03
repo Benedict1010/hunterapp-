@@ -104,8 +104,9 @@ PostgreSQL serves as the primary relational data store, ensuring data integrity 
 
 ## 13. Notification Architecture
 
-- Supports Push Notifications (FCM) and In-app notifications.
-- Triggered by job matches, status updates, or system alerts.
+- Persistent in-app notification foundation with `Notification` entity (`id`, `user_id`, `title`, `message`, `notification_type`, `is_read`, `related_entity_type`, `related_entity_id`, timestamps).
+- Centralized `NotificationService` handling creation, bulk creation, pagination, read state, unread counting, and clean service-level event helper interfaces (`notify_application_status_changed`, `notify_job_match_found`, `notify_resume_tailored`).
+- Designed to support future Push Notifications (FCM) and event triggers without breaking the persistence API foundation.
 
 ## 14. Background Job-Search Architecture
 
@@ -267,10 +268,13 @@ hunter-backend/
 - `updated_at`: DateTime(timezone=True)
 
 ### Notification
-- `id`: UUID
-- `user_id`: FK(User)
-- `title`: String
+- `id`: UUID / String(36)
+- `user_id`: FK(User, ON DELETE CASCADE)
+- `notification_type`: String(64)
+- `title`: String(255)
 - `message`: Text
-- `is_read`: Boolean
-- `type`: String
-- `created_at`: DateTime
+- `is_read`: Boolean (default `false`)
+- `related_entity_type`: String(64) (Nullable)
+- `related_entity_id`: String(36) (Nullable)
+- `created_at`: DateTime(timezone=True)
+- `updated_at`: DateTime(timezone=True)

@@ -35,6 +35,7 @@ migrate_working_dir/
 
 # Local backend environment configuration
 /hunter-backend/.env
+/hunter-backend/uploads/
 
 # Symbolication related
 app.*.symbols

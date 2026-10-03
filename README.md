@@ -72,6 +72,23 @@ User
 - **Current Limitation**: Versions store structured plain text (`content_text`).
 - **Future Enhancement**: Rendering tailored text into downloadable PDF/DOCX files.
 
+## Persistent Notifications Foundation (Phase 3F.4)
+
+### Notification Model & Foundation
+The `Notification` entity provides persistent in-app notifications for users, storing title, message, notification type, read state (`is_read`), and optional entity references (`related_entity_type`, `related_entity_id`).
+
+#### Key Features & Endpoints
+- `POST /notifications`: Creates a notification for the authenticated user (HTTP 201).
+- `GET /notifications`: Returns user's notifications ordered newest first with pagination (`limit`, `offset`) and `is_read` filtering.
+- `GET /notifications/unread-count`: Returns the current count of unread notifications for the user.
+- `PATCH /notifications/read-all`: Marks all unread notifications for the user as read and returns the `updated_count`.
+- `GET /notifications/{notification_id}`: Fetches notification detail (owner-only, HTTP 403 for unauthorized access).
+- `PATCH /notifications/{notification_id}/read`: Idempotently marks a single notification as read.
+
+#### Security & Service Layer
+- **Ownership & JWT**: All notification endpoints derive ownership strictly from JWT (`current_user.id`) and prevent cross-user access (IDOR).
+- **Notification Service**: Centralized `NotificationService` handles creation, bulk creation, list pagination, read state transitions, unread counting, and clean event helper interfaces (`notify_application_status_changed`, `notify_job_match_found`, `notify_resume_tailored`) ready for future event triggers and FCM integration.
+
 ## Getting Started
 
 This project includes a Flutter mobile app (`lib/`) and FastAPI backend (`hunter-backend/`).

@@ -4,6 +4,7 @@ from app.models.resume import Resume, ResumeVersion, ResumeVersionType
 from app.models.match import JobMatch
 from app.models.application import Application, ApplicationStatus
 from app.models.application_timeline import ApplicationTimeline
+from app.models.notification import Notification
 
 __all__ = [
     "Job",
@@ -18,5 +19,6 @@ __all__ = [
     "Application",
     "ApplicationStatus",
     "ApplicationTimeline",
+    "Notification",
 ]
 
