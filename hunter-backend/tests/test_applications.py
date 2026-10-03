@@ -112,7 +112,7 @@ def test_create_application_success(client, database):
     assert data["resume_version_id"] == version.id
     # 17. Application URL/source work
     assert data["application_url"] == "https://company.com/jobs/123/apply"
-    assert data["source"] == "LinkedIn"
+    assert data["source"] == "linkedin"
     # 18. Timestamps persisted
     assert data["created_at"] is not None
     assert data["updated_at"] is not None
@@ -208,7 +208,7 @@ def test_update_application_status_and_metadata(client, database):
     )
     assert res_meta.status_code == 200
     assert res_meta.json()["application_url"] == "https://new.url"
-    assert res_meta.json()["source"] == "Referral"
+    assert res_meta.json()["source"] == "referral"
 
 
 # 9, 10. User cannot change job_id or resume_version_id through update

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -10,7 +10,12 @@ from app.models.application_timeline import ApplicationTimeline
 from app.models.job import Job
 from app.models.resume import ResumeVersion
 from app.models.user import User
-from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationUpdate
+from app.schemas.application import (
+    ApplicationCreate,
+    ApplicationExternalLinkRead,
+    ApplicationRead,
+    ApplicationUpdate,
+)
 from app.schemas.application_timeline import ApplicationTimelineCreate, ApplicationTimelineRead
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -22,7 +27,9 @@ def create_application(
     current_user: User = Depends(get_current_user),
     database: Session = Depends(get_db),
 ) -> Application:
-    job = database.scalar(select(Job).where(Job.id == payload.job_id))
+    job = database.scalar(
+        select(Job).options(joinedload(Job.source)).where(Job.id == payload.job_id)
+    )
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -52,6 +59,10 @@ def create_application(
     applied_at_val = payload.applied_at or datetime.now(timezone.utc)
     now = datetime.now(timezone.utc)
 
+    source_val = payload.source
+    if source_val is None and job.source:
+        source_val = job.source.name.lower()
+
     try:
         application = Application(
             user_id=current_user.id,
@@ -59,7 +70,7 @@ def create_application(
             resume_version_id=payload.resume_version_id,
             status=status_val,
             application_url=payload.application_url,
-            source=payload.source,
+            source=source_val,
             applied_at=applied_at_val,
         )
 
@@ -119,6 +130,38 @@ def get_application(
             detail="Access denied.",
         )
     return application
+
+
+@router.get("/{application_id}/external-link", response_model=ApplicationExternalLinkRead)
+def get_application_external_link(
+    application_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> ApplicationExternalLinkRead:
+    application = database.scalar(
+        select(Application).where(Application.id == application_id)
+    )
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found.",
+        )
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+    if not application.application_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="External application URL not found for this application.",
+        )
+
+    return ApplicationExternalLinkRead(
+        application_id=application.id,
+        application_url=application.application_url,
+        source=application.source,
+    )
 
 
 @router.patch("/{application_id}", response_model=ApplicationRead)

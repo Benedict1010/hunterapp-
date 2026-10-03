@@ -96,6 +96,11 @@ PostgreSQL serves as the primary relational data store, ensuring data integrity 
 
 - Tracks the lifecycle of a job application: `Applied` -> `Interviewing` -> `Offered` -> `Rejected`.
 - **ApplicationTimeline**: Captures every state change and user note.
+- **External Application Tracking**:
+  - **Job Discovery Source (`JobSource`)**: Represents where Hunter discovered/ingested the job.
+  - **Application Source (`Application.source`)**: Normalized lowercase identifier (e.g. `linkedin`, `naukri`, `internshala`, `unstop`, `company_site`) representing where the user actually submitted their application.
+  - **Application URL Validation**: Enforces valid HTTP/HTTPS URLs (max 1000 chars), rejecting non-HTTP schemes (`javascript:`, `data:`, `file:`) safely as data without server-side HTTP fetching or execution.
+  - **External Link Action**: Endpoint `GET /applications/{application_id}/external-link` returns URL and source metadata for client navigation.
 
 ## 13. Notification Architecture
 

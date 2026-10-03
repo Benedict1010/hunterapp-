@@ -51,10 +51,22 @@ User
 - `POST /applications`: Creates an application linked to `job_id` and `resume_version_id` owned by the user, creating an initial timeline event.
 - `GET /applications`: Lists applications belonging to the authenticated user with optional `status` filtering.
 - `GET /applications/{application_id}`: Fetches application detail for the owner.
+- `GET /applications/{application_id}/external-link`: Dedicated read-only endpoint returning stored `application_url` and `source` for the owner.
 - `PATCH /applications/{application_id}`: Updates mutable metadata. Status changes generate timeline history.
 - `POST /applications/{application_id}/timeline`: Adds a new timeline event and updates `Application.status`.
 - `GET /applications/{application_id}/timeline`: Lists timeline events newest-first.
 - `GET /applications/{application_id}/timeline/{timeline_id}`: Retrieves a single timeline event (with IDOR protection).
+
+### External Application Tracking (Phase 3F.3)
+
+#### Job Discovery Source vs Application Source
+- **Job Discovery Source (`JobSource`)**: Identifies where Hunter discovered/ingested the job posting (e.g., automated scraper source).
+- **Application Source (`Application.source`)**: Normalized lowercase string identifier (e.g., `linkedin`, `naukri`, `internshala`, `unstop`, `company_site`) representing where the user actually completed or submitted their application. Defaults to the job's discovery source name when omitted.
+
+#### Application URL & Security Validation
+- **`Application.application_url`**: Stores the external application URL (up to 1000 characters) so the mobile app can launch or return to the external page.
+- **URL Validation**: Validates `http://` and `https://` URLs with valid netloc domains. Strictly rejects non-HTTP schemes (`javascript:`, `data:`, `file:`) and malformed strings.
+- **Data-Only Storage**: URLs are validated and stored safely as data only. The backend does not perform crawling, scraping, or server-side URL fetching.
 
 #### Limitations & Future Enhancements
 - **Current Limitation**: Versions store structured plain text (`content_text`).
