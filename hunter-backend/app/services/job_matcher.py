@@ -5,6 +5,7 @@ from app.models.resume import Resume
 from app.models.match import JobMatch
 from app.services.skill_extractor import extract_skills_from_text
 from app.services.skill_vocabulary import normalize_skill
+from app.services.notification_service import NotificationService
 
 class JobMatcher:
     def __init__(self, db: Session):
@@ -85,6 +86,20 @@ class JobMatcher:
             )
             self.db.add(match_record)
 
-        self.db.commit()
-        self.db.refresh(match_record)
-        return match_record
+            NotificationService.notify_job_match_found(
+                db=self.db,
+                user_id=user_id,
+                job_id=job_id,
+                job_title=job.title,
+                match_score=score,
+                company=job.company,
+                commit=False,
+            )
+
+        try:
+            self.db.commit()
+            self.db.refresh(match_record)
+            return match_record
+        except Exception:
+            self.db.rollback()
+            raise

@@ -328,7 +328,7 @@ def test_service_event_groundwork(database):
         old_status="applied",
         new_status="interview",
     )
-    assert n1.notification_type == "application_status_change"
+    assert n1.notification_type == "application_status_changed"
     assert n1.related_entity_type == "application"
     assert n1.related_entity_id == "app-1"
 
@@ -338,10 +338,11 @@ def test_service_event_groundwork(database):
         job_id="job-1",
         job_title="Senior Engineer",
         match_score=0.92,
+        company="Acme Corp",
     )
     assert n2.notification_type == "job_match_found"
     assert n2.related_entity_type == "job"
-    assert "92%" in n2.message
+    assert "Senior Engineer" in n2.message
 
     n3 = NotificationService.notify_resume_tailored(
         db=database,
@@ -349,5 +350,5 @@ def test_service_event_groundwork(database):
         resume_version_id="rv-1",
         job_title="Senior Engineer",
     )
-    assert n3.notification_type == "resume_tailoring_completed"
+    assert n3.notification_type == "resume_tailored"
     assert n3.related_entity_type == "resume_version"

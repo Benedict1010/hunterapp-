@@ -8,6 +8,7 @@ from app.models.resume import Resume, ResumeVersion, ResumeVersionType
 from app.services.ai.base import AIProvider
 from app.services.ai.schemas import AITailoringRequest, AITailoringResponse
 from app.services.ai.exceptions import AITailoringValidationError
+from app.services.notification_service import NotificationService
 from app.services.skill_extractor import extract_skills_from_text
 
 
@@ -62,7 +63,7 @@ class ResumeTailor:
         # 6. Post-generation safety validation
         self.validate_safety(resume.content_text, job, response)
 
-        # 7. Persist tailored resume version
+        # 7. Persist tailored resume version and trigger notification
         try:
             version = ResumeVersion(
                 resume_id=resume_id,
@@ -74,6 +75,16 @@ class ResumeTailor:
                 warnings=response.warnings,
             )
             self.db.add(version)
+            self.db.flush()
+
+            NotificationService.notify_resume_tailored(
+                db=self.db,
+                user_id=user_id,
+                resume_version_id=version.id,
+                job_title=job.title,
+                commit=False,
+            )
+
             self.db.commit()
             self.db.refresh(version)
         except Exception as e:

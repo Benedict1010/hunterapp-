@@ -17,6 +17,7 @@ from app.schemas.application import (
     ApplicationUpdate,
 )
 from app.schemas.application_timeline import ApplicationTimelineCreate, ApplicationTimelineRead
+from app.services.notification_service import NotificationService
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -172,7 +173,7 @@ def update_application(
     database: Session = Depends(get_db),
 ) -> Application:
     application = database.scalar(
-        select(Application).where(Application.id == application_id)
+        select(Application).options(joinedload(Application.job)).where(Application.id == application_id)
     )
     if not application:
         raise HTTPException(
@@ -185,6 +186,7 @@ def update_application(
             detail="Access denied.",
         )
 
+    old_status = application.status
     new_status_val = None
     if payload.status is not None:
         status_str = (
@@ -192,7 +194,7 @@ def update_application(
             if isinstance(payload.status, ApplicationStatus)
             else str(payload.status)
         )
-        if status_str != application.status:
+        if status_str != old_status:
             new_status_val = status_str
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -219,6 +221,19 @@ def update_application(
             )
             database.add(timeline_event)
 
+            job_title = application.job.title if application.job else None
+            company = application.job.company if application.job else None
+            NotificationService.notify_application_status_changed(
+                db=database,
+                user_id=current_user.id,
+                application_id=application.id,
+                old_status=old_status,
+                new_status=new_status_val,
+                job_title=job_title,
+                company=company,
+                commit=False,
+            )
+
         database.commit()
         database.refresh(application)
         return application
@@ -235,13 +250,53 @@ def create_timeline_event(
     database: Session = Depends(get_db),
 ) -> ApplicationTimeline:
     application = database.scalar(
-        select(Application).where(Application.id == application_id)
+        select(Application).options(joinedload(Application.job)).where(Application.id == application_id)
     )
     if not application:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found.",
         )
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
+        )
+
+    old_status = application.status
+    status_val = payload.status.value
+    now = datetime.now(timezone.utc)
+
+    try:
+        timeline_event = ApplicationTimeline(
+            application_id=application.id,
+            status=status_val,
+            note=payload.note,
+            created_at=now,
+        )
+        database.add(timeline_event)
+        application.status = status_val
+
+        if status_val != old_status:
+            job_title = application.job.title if application.job else None
+            company = application.job.company if application.job else None
+            NotificationService.notify_application_status_changed(
+                db=database,
+                user_id=current_user.id,
+                application_id=application.id,
+                old_status=old_status,
+                new_status=status_val,
+                job_title=job_title,
+                company=company,
+                commit=False,
+            )
+
+        database.commit()
+        database.refresh(timeline_event)
+        return timeline_event
+    except Exception:
+        database.rollback()
+        raise
     if application.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

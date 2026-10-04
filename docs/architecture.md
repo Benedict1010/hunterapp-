@@ -106,7 +106,12 @@ PostgreSQL serves as the primary relational data store, ensuring data integrity 
 
 - Persistent in-app notification foundation with `Notification` entity (`id`, `user_id`, `title`, `message`, `notification_type`, `is_read`, `related_entity_type`, `related_entity_id`, timestamps).
 - Centralized `NotificationService` handling creation, bulk creation, pagination, read state, unread counting, and clean service-level event helper interfaces (`notify_application_status_changed`, `notify_job_match_found`, `notify_resume_tailored`).
-- Designed to support future Push Notifications (FCM) and event triggers without breaking the persistence API foundation.
+- **Domain Event Integrations**:
+  - **Application Status Changes**: Genuine application status transitions generate `application_status_changed` notifications containing job title and company details.
+  - **Job Matches**: Newly created `JobMatch` records generate `job_match_found` notifications. Re-requests for existing matches do not trigger duplicate notifications.
+  - **Resume Tailoring**: Successful creation of a validated `ResumeVersion` generates `resume_tailored` notifications. Failed or unsafe tailoring attempts generate zero notifications.
+- **Transaction Safety**: Notification persistence is strictly transactional and atomic with the originating domain operation.
+- **FCM Delivery**: External push delivery via FCM remains deferred to future mobile delivery phases.
 
 ## 14. Background Job-Search Architecture
 

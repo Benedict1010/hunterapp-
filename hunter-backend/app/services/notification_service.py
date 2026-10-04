@@ -15,6 +15,7 @@ class NotificationService:
         notification_type: str = "general",
         related_entity_type: str | None = None,
         related_entity_id: str | None = None,
+        commit: bool = True,
     ) -> Notification:
         notification = Notification(
             user_id=user_id,
@@ -26,8 +27,11 @@ class NotificationService:
             is_read=False,
         )
         db.add(notification)
-        db.commit()
-        db.refresh(notification)
+        if commit:
+            db.commit()
+            db.refresh(notification)
+        else:
+            db.flush()
         return notification
 
     @staticmethod
@@ -132,7 +136,7 @@ class NotificationService:
         )
         return db.scalar(stmt) or 0
 
-    # Event Groundwork
+    # Event Groundwork & Domain Integration
     @staticmethod
     def notify_application_status_changed(
         db: Session,
@@ -140,15 +144,26 @@ class NotificationService:
         application_id: str,
         old_status: str,
         new_status: str,
+        job_title: str | None = None,
+        company: str | None = None,
+        commit: bool = False,
     ) -> Notification:
+        if job_title and company:
+            message = f"Your application for {job_title} at {company} has moved to {new_status}."
+        elif job_title:
+            message = f"Your application for {job_title} has moved to {new_status}."
+        else:
+            message = f"Your application status changed from {old_status} to {new_status}."
+
         return NotificationService.create_notification(
             db=db,
             user_id=user_id,
-            title="Application Status Updated",
-            message=f"Your application status changed from {old_status} to {new_status}.",
-            notification_type="application_status_change",
+            title="Application Update",
+            message=message,
+            notification_type="application_status_changed",
             related_entity_type="application",
             related_entity_id=application_id,
+            commit=commit,
         )
 
     @staticmethod
@@ -158,15 +173,23 @@ class NotificationService:
         job_id: str,
         job_title: str,
         match_score: float,
+        company: str | None = None,
+        commit: bool = False,
     ) -> Notification:
+        if company:
+            message = f"A new job match was found for {job_title} at {company}."
+        else:
+            message = f"A new job match was found for {job_title}."
+
         return NotificationService.create_notification(
             db=db,
             user_id=user_id,
-            title="New Job Match Found",
-            message=f"Found a high match ({int(match_score * 100)}%) for '{job_title}'.",
+            title="New Job Match",
+            message=message,
             notification_type="job_match_found",
             related_entity_type="job",
             related_entity_id=job_id,
+            commit=commit,
         )
 
     @staticmethod
@@ -175,13 +198,15 @@ class NotificationService:
         user_id: str,
         resume_version_id: str,
         job_title: str,
+        commit: bool = False,
     ) -> Notification:
         return NotificationService.create_notification(
             db=db,
             user_id=user_id,
-            title="Resume Tailoring Complete",
-            message=f"Your resume has been tailored for '{job_title}'.",
-            notification_type="resume_tailoring_completed",
+            title="Resume Ready",
+            message=f"Your tailored resume for {job_title} is ready.",
+            notification_type="resume_tailored",
             related_entity_type="resume_version",
             related_entity_id=resume_version_id,
+            commit=commit,
         )

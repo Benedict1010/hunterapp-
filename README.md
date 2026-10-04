@@ -72,7 +72,7 @@ User
 - **Current Limitation**: Versions store structured plain text (`content_text`).
 - **Future Enhancement**: Rendering tailored text into downloadable PDF/DOCX files.
 
-## Persistent Notifications Foundation (Phase 3F.4)
+## Persistent Notifications & Domain Event Integration (Phase 3F.4 & 3F.5)
 
 ### Notification Model & Foundation
 The `Notification` entity provides persistent in-app notifications for users, storing title, message, notification type, read state (`is_read`), and optional entity references (`related_entity_type`, `related_entity_id`).
@@ -85,9 +85,13 @@ The `Notification` entity provides persistent in-app notifications for users, st
 - `GET /notifications/{notification_id}`: Fetches notification detail (owner-only, HTTP 403 for unauthorized access).
 - `PATCH /notifications/{notification_id}/read`: Idempotently marks a single notification as read.
 
-#### Security & Service Layer
-- **Ownership & JWT**: All notification endpoints derive ownership strictly from JWT (`current_user.id`) and prevent cross-user access (IDOR).
-- **Notification Service**: Centralized `NotificationService` handles creation, bulk creation, list pagination, read state transitions, unread counting, and clean event helper interfaces (`notify_application_status_changed`, `notify_job_match_found`, `notify_resume_tailored`) ready for future event triggers and FCM integration.
+#### Domain Event Integration & Transaction Safety
+Automated in-app notifications are transactionally generated during core domain operations using `NotificationService`:
+1. **Application Status Changes**: Genuine application status transitions (`applied` -> `interview`, `offer`, etc.) generate an `application_status_changed` notification referencing the job title and company. Metadata-only updates or resubmissions of the same status do not produce duplicate notifications.
+2. **New Job Matches**: Creation of a newly persisted `JobMatch` generates a `job_match_found` notification referencing the matched job title and company. Re-calculating or requesting an existing match does not produce duplicate notifications.
+3. **Successful AI Resume Tailoring**: Creating and persisting a validated `ResumeVersion` generates a `resume_tailored` notification referencing the target job title. If AI generation or safety validation fails, no notification is created.
+4. **Transaction Safety**: Notification persistence is strictly atomic and part of the originating database transaction (`commit=False` flush pattern). If the parent operation rolls back, the notification is rolled back consistently.
+5. **FCM Delivery**: External FCM push notification delivery remains intentionally deferred to future integration phases.
 
 ## Getting Started
 
