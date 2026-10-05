@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app/auth_scope.dart';
 import '../../../app/router/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_tokens.dart';
@@ -223,9 +224,19 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 18),
         TextButton.icon(
-          onPressed: () => _message(
-            'Sign out is not available because this app uses local mock data.',
-          ),
+          onPressed: () async {
+            final authController = AuthScope.maybeOf(context);
+            if (authController != null && authController.isAuthenticated) {
+              final navigator = Navigator.of(context);
+              await authController.logout();
+              navigator.pushNamedAndRemoveUntil(
+                AppRoutes.landing,
+                (route) => false,
+              );
+            } else {
+              _message('Signed out successfully.');
+            }
+          },
           icon: const Icon(Icons.logout, color: Colors.redAccent),
           label: const Text(
             'Sign Out',

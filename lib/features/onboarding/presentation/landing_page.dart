@@ -6,6 +6,7 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/app_chips.dart';
 import '../../../core/widgets/app_surface.dart';
+import '../../auth/presentation/auth_sheet.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -61,7 +62,7 @@ class LandingPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Center(
               child: TextButton(
-                onPressed: () {},
+                onPressed: () => AuthSheet.show(context, isRegister: false),
                 child: RichText(
                   text: TextSpan(
                     style: Theme.of(context).textTheme.bodyMedium,
