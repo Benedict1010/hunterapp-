@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hunter/app/app.dart';
+import 'package:hunter/core/network/api_client.dart';
+import 'package:hunter/core/storage/token_storage.dart';
+import 'package:hunter/features/resume/data/resume_service.dart';
+import 'package:hunter/features/resume/presentation/resume_controller.dart';
 
 void main() {
+  Widget buildTestApp() {
+    final tokenStorage = InMemoryTokenStorage();
+    final apiClient = ApiClient(tokenStorage: tokenStorage);
+    final resumeService = ResumeService(apiClient: apiClient);
+    final resumeController = ResumeController(resumeService: resumeService);
+    return AiJobHunterApp(resumeController: resumeController);
+  }
+
   testWidgets('landing starts the supplied onboarding flow', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const AiJobHunterApp());
+    await tester.pumpWidget(buildTestApp());
     expect(find.text('Your AI Job Search,'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Get Started'), 300);
     await tester.tap(find.text('Get Started'));
@@ -19,7 +31,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const AiJobHunterApp());
+    await tester.pumpWidget(buildTestApp());
 
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     navigator.pushNamed('/home');
@@ -53,7 +65,7 @@ void main() {
   testWidgets('phase 2E routes render local UI screens', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(const AiJobHunterApp());
+    await tester.pumpWidget(buildTestApp());
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
 
     navigator.pushNamed('/application-details');
