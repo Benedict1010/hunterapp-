@@ -1,0 +1,244 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../data/job_service.dart';
+import '../data/mock_jobs.dart';
+import '../domain/ai_analysis.dart';
+import '../domain/job.dart';
+import '../domain/job_match.dart';
+
+enum JobStateStatus { initial, loading, loaded, error }
+
+enum JobDetailStatus { initial, loading, loaded, error }
+
+enum MatchStateStatus { initial, loading, loaded, error }
+
+enum AnalysisStateStatus { initial, loading, loaded, error }
+
+class JobController extends ChangeNotifier {
+  final JobService jobService;
+
+  JobStateStatus _status;
+  JobDetailStatus _detailStatus = JobDetailStatus.loaded;
+  MatchStateStatus _matchStatus = MatchStateStatus.initial;
+  AnalysisStateStatus _analysisStatus = AnalysisStateStatus.initial;
+
+  List<Job> _jobs;
+  int _totalJobs;
+  Job? _selectedJob;
+  JobMatch? _currentMatch;
+  AiAnalysis? _currentAnalysis;
+  final Map<String, JobMatch> _matchesByJobId = {};
+
+  String? _errorMessage;
+  String? _matchErrorMessage;
+  String? _analysisErrorMessage;
+
+  JobController({
+    required this.jobService,
+    List<Job>? initialJobs,
+    JobStateStatus initialStatus = JobStateStatus.loaded,
+  }) : _jobs = initialJobs ?? List.of(defaultMockJobs),
+       _totalJobs = (initialJobs ?? defaultMockJobs).length,
+       _selectedJob = (initialJobs ?? defaultMockJobs).isNotEmpty
+           ? (initialJobs ?? defaultMockJobs).first
+           : null,
+       _status = initialStatus;
+
+  JobStateStatus get status => _status;
+  JobDetailStatus get detailStatus => _detailStatus;
+  MatchStateStatus get matchStatus => _matchStatus;
+  AnalysisStateStatus get analysisStatus => _analysisStatus;
+
+  List<Job> get jobs => List.unmodifiable(_jobs);
+  int get totalJobs => _totalJobs;
+  Job? get selectedJob => _selectedJob;
+  JobMatch? get currentMatch => _currentMatch;
+  AiAnalysis? get currentAnalysis => _currentAnalysis;
+  Map<String, JobMatch> get matchesByJobId => Map.unmodifiable(_matchesByJobId);
+
+  String? get errorMessage => _errorMessage;
+  String? get matchErrorMessage => _matchErrorMessage;
+  String? get analysisErrorMessage => _analysisErrorMessage;
+
+  bool get isLoadingJobs => _status == JobStateStatus.loading;
+  bool get isLoadingDetail => _detailStatus == JobDetailStatus.loading;
+  bool get isCalculatingMatch => _matchStatus == MatchStateStatus.loading;
+  bool get isAnalyzing => _analysisStatus == AnalysisStateStatus.loading;
+
+  bool get hasError => _status == JobStateStatus.error;
+
+  void selectJob(Job? job) {
+    _selectedJob = job;
+    _currentMatch = job != null ? _matchesByJobId[job.id] : null;
+    _currentAnalysis = null;
+    _matchStatus = _currentMatch != null
+        ? MatchStateStatus.loaded
+        : MatchStateStatus.initial;
+    _analysisStatus = AnalysisStateStatus.initial;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    _matchErrorMessage = null;
+    _analysisErrorMessage = null;
+    if (_status == JobStateStatus.error) {
+      _status = JobStateStatus.loaded;
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadJobs({
+    String? company,
+    String? location,
+    String? jobType,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    _status = JobStateStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final token = await jobService.apiClient.tokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        _status = JobStateStatus.loaded;
+        notifyListeners();
+        return;
+      }
+
+      final response = await jobService.listJobs(
+        company: company,
+        location: location,
+        jobType: jobType,
+        limit: limit,
+        offset: offset,
+      );
+      _jobs = response.items;
+      _totalJobs = response.total;
+      _status = JobStateStatus.loaded;
+    } on ApiException catch (e) {
+      _errorMessage = e.userFriendlyMessage;
+      _status = JobStateStatus.error;
+    } catch (e) {
+      _errorMessage = 'Failed to load jobs.';
+      _status = JobStateStatus.error;
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> loadUserMatches() async {
+    try {
+      final token = await jobService.apiClient.tokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        return;
+      }
+      final matches = await jobService.listMatches();
+      for (final match in matches) {
+        _matchesByJobId[match.jobId] = match;
+      }
+      notifyListeners();
+    } catch (_) {
+      // Non-fatal if matches couldn't be loaded (e.g. unauthenticated)
+    }
+  }
+
+  Future<Job?> loadJobDetail(String jobId) async {
+    _detailStatus = JobDetailStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final token = await jobService.apiClient.tokenStorage.getToken();
+      if (token == null || token.isEmpty) {
+        final matches = _jobs.where((j) => j.id == jobId);
+        _selectedJob = matches.isNotEmpty
+            ? matches.first
+            : softwareEngineerIntern;
+        _detailStatus = JobDetailStatus.loaded;
+        notifyListeners();
+        return _selectedJob;
+      }
+
+      final job = await jobService.getJob(jobId);
+      _selectedJob = job;
+      _currentMatch = _matchesByJobId[jobId];
+      _detailStatus = JobDetailStatus.loaded;
+      notifyListeners();
+      return job;
+    } on ApiException catch (e) {
+      _errorMessage = e.userFriendlyMessage;
+      _detailStatus = JobDetailStatus.error;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _errorMessage = 'Failed to load job details.';
+      _detailStatus = JobDetailStatus.error;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<JobMatch?> calculateMatch({
+    required String jobId,
+    required String resumeId,
+  }) async {
+    _matchStatus = MatchStateStatus.loading;
+    _matchErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final match = await jobService.createOrGetMatch(
+        jobId: jobId,
+        resumeId: resumeId,
+      );
+      _currentMatch = match;
+      _matchesByJobId[jobId] = match;
+      _matchStatus = MatchStateStatus.loaded;
+      notifyListeners();
+      return match;
+    } on ApiException catch (e) {
+      _matchErrorMessage = e.userFriendlyMessage;
+      _matchStatus = MatchStateStatus.error;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _matchErrorMessage = 'Failed to calculate job match.';
+      _matchStatus = MatchStateStatus.error;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<AiAnalysis?> analyzeJob({
+    required String jobId,
+    required String resumeId,
+  }) async {
+    _analysisStatus = AnalysisStateStatus.loading;
+    _analysisErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final analysis = await jobService.analyzeJobMatch(
+        jobId: jobId,
+        resumeId: resumeId,
+      );
+      _currentAnalysis = analysis;
+      _analysisStatus = AnalysisStateStatus.loaded;
+      notifyListeners();
+      return analysis;
+    } on ApiException catch (e) {
+      _analysisErrorMessage = e.userFriendlyMessage;
+      _analysisStatus = AnalysisStateStatus.error;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _analysisErrorMessage = 'Failed to run AI job analysis.';
+      _analysisStatus = AnalysisStateStatus.error;
+      notifyListeners();
+      return null;
+    }
+  }
+}

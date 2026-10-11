@@ -5,9 +5,12 @@ import '../core/network/api_client.dart';
 import '../core/storage/token_storage.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/presentation/auth_controller.dart';
+import '../features/jobs/data/job_service.dart';
+import '../features/jobs/presentation/job_controller.dart';
 import '../features/resume/data/resume_service.dart';
 import '../features/resume/presentation/resume_controller.dart';
 import 'auth_scope.dart';
+import 'job_scope.dart';
 import 'resume_scope.dart';
 import 'router/app_router.dart';
 import 'router/app_routes.dart';
@@ -16,11 +19,13 @@ import 'theme/app_theme.dart';
 class AiJobHunterApp extends StatefulWidget {
   final AuthController? authController;
   final ResumeController? resumeController;
+  final JobController? jobController;
 
   const AiJobHunterApp({
     super.key,
     this.authController,
     this.resumeController,
+    this.jobController,
   });
 
   @override
@@ -30,6 +35,7 @@ class AiJobHunterApp extends StatefulWidget {
 class _AiJobHunterAppState extends State<AiJobHunterApp> {
   late final AuthController _authController;
   late final ResumeController _resumeController;
+  late final JobController _jobController;
 
   @override
   void initState() {
@@ -57,6 +63,13 @@ class _AiJobHunterAppState extends State<AiJobHunterApp> {
       _resumeController = ResumeController(resumeService: resumeService);
     }
 
+    if (widget.jobController != null) {
+      _jobController = widget.jobController!;
+    } else {
+      final jobService = JobService(apiClient: apiClient);
+      _jobController = JobController(jobService: jobService);
+    }
+
     _authController.checkSession();
   }
 
@@ -66,12 +79,15 @@ class _AiJobHunterAppState extends State<AiJobHunterApp> {
       controller: _authController,
       child: ResumeScope(
         controller: _resumeController,
-        child: MaterialApp(
-          title: 'AI Job Hunter',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          initialRoute: AppRoutes.landing,
-          onGenerateRoute: AppRouter.onGenerateRoute,
+        child: JobScope(
+          controller: _jobController,
+          child: MaterialApp(
+            title: 'AI Job Hunter',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(),
+            initialRoute: AppRoutes.landing,
+            onGenerateRoute: AppRouter.onGenerateRoute,
+          ),
         ),
       ),
     );
