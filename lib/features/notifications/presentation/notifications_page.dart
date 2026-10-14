@@ -1,164 +1,235 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/notification_scope.dart';
 import '../../../app/router/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/widgets/app_shell.dart';
 import '../../../core/widgets/app_surface.dart';
-import '../data/mock_notifications.dart';
 import '../domain/app_notification.dart';
+import 'notification_controller.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
+
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  late List<AppNotification> _notifications;
   var _unreadOnly = false;
+
   @override
   void initState() {
     super.initState();
-    _notifications = mockNotifications;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = NotificationScope.maybeOf(context);
+      if (controller != null &&
+          controller.status == NotificationStateStatus.initial) {
+        controller.loadNotifications();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final visible = _notifications
-        .where((item) => !_unreadOnly || !item.isRead)
-        .toList();
+    final controller = NotificationScope.maybeOf(context);
+
     return AppShell(
       navigationVariant: AppNavigationVariant.optimize,
       selectedIndex: 2,
       showNotificationAction: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Notifications',
-                  style: Theme.of(context).textTheme.displaySmall,
-                ),
-              ),
-              IconButton(
-                onPressed: () => _message(
-                  'Filters are not available in this local preview.',
-                ),
-                icon: const Icon(Icons.filter_list),
-                tooltip: 'Filter',
-              ),
-              IconButton(
-                onPressed: _markAllRead,
-                icon: const Icon(Icons.done_all),
-                tooltip: 'Mark all as read',
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'CAREER ASSISTANT UPDATES',
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(letterSpacing: 1),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _FilterTab(
-                label: 'All Alerts',
-                selected: !_unreadOnly,
-                onTap: () => setState(() => _unreadOnly = false),
-              ),
-              const SizedBox(width: 18),
-              _FilterTab(
-                label: 'Unread',
-                selected: _unreadOnly,
-                hasDot: _notifications.any((item) => !item.isRead),
-                onTap: () => setState(() => _unreadOnly = true),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          for (final notification in visible)
-            _NotificationCard(
-              notification: notification,
-              onRead: () => _read(notification.id),
-              onAction: () => _open(notification),
-            ),
-          const SizedBox(height: 8),
-          AppSurface(
-            color: AppColors.primarySoft,
-            borderColor: Colors.transparent,
-            shadows: const [],
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: RefreshIndicator(
+        onRefresh: () async {
+          if (controller != null) {
+            await controller.loadNotifications();
+          }
+        },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
+          children: [
+            Row(
               children: [
-                const Icon(Icons.auto_awesome, color: AppColors.primary),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AI Pro Tip',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const Text(
-                        'Applications with a tailored resume are more likely to receive a response.',
-                      ),
-                      TextButton(
-                        onPressed: () => _message(
-                          'Tips are available in this local preview.',
-                        ),
-                        child: const Text('Learn more  ›'),
-                      ),
-                    ],
+                  child: Text(
+                    'Notifications',
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
+                ),
+                IconButton(
+                  onPressed: () =>
+                      _message(context, 'Filters are set via tab selection.'),
+                  icon: const Icon(Icons.filter_list),
+                  tooltip: 'Filter',
+                ),
+                IconButton(
+                  onPressed: () async {
+                    if (controller != null) {
+                      await controller.markAllAsRead();
+                      if (context.mounted) {
+                        _message(context, 'All notifications marked as read.');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.done_all),
+                  tooltip: 'Mark all as read',
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'You are all caught up for the last 7 days.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              'CAREER ASSISTANT UPDATES',
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(letterSpacing: 1),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _FilterTab(
+                  label: 'All Alerts',
+                  selected: !_unreadOnly,
+                  onTap: () => setState(() => _unreadOnly = false),
+                ),
+                const SizedBox(width: 18),
+                _FilterTab(
+                  label: 'Unread',
+                  selected: _unreadOnly,
+                  hasDot: (controller?.unreadCount ?? 0) > 0,
+                  onTap: () => setState(() => _unreadOnly = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (controller != null && controller.isLoading) ...[
+              const SizedBox(height: AppSpacing.xl),
+              const Center(child: CircularProgressIndicator()),
+              const SizedBox(height: AppSpacing.xl),
+            ] else if (controller != null && controller.hasError) ...[
+              const SizedBox(height: AppSpacing.lg),
+              AppSurface(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.warning,
+                      size: 40,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      controller.errorMessage ??
+                          'Failed to load notifications.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ElevatedButton.icon(
+                      onPressed: () => controller.loadNotifications(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Builder(
+                builder: (context) {
+                  final all = controller?.notifications ?? [];
+                  final visible = all
+                      .where((item) => !_unreadOnly || !item.isRead)
+                      .toList();
+
+                  if (visible.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: Text('No notifications found.')),
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      for (final notification in visible)
+                        _NotificationCard(
+                          notification: notification,
+                          onRead: () => controller?.markAsRead(notification.id),
+                          onAction: () =>
+                              _open(context, notification, controller),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
+            const SizedBox(height: 8),
+            AppSurface(
+              color: AppColors.primarySoft,
+              borderColor: Colors.transparent,
+              shadows: const [],
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.auto_awesome, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Pro Tip',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const Text(
+                          'Applications with a tailored resume are more likely to receive a response.',
+                        ),
+                        TextButton(
+                          onPressed: () => _message(
+                            context,
+                            'Tailor your resume from any job detail page.',
+                          ),
+                          child: const Text('Learn more  ›'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'You are all caught up.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _read(String id) => setState(
-    () => _notifications = [
-      for (final item in _notifications)
-        if (item.id == id) item.copyWith(isRead: true) else item,
-    ],
-  );
-  void _markAllRead() {
-    setState(
-      () => _notifications = [
-        for (final item in _notifications) item.copyWith(isRead: true),
-      ],
-    );
-    _message('All notifications marked as read.');
-  }
-
-  void _open(AppNotification notification) {
-    _read(notification.id);
+  void _open(
+    BuildContext context,
+    AppNotification notification,
+    NotificationController? controller,
+  ) {
+    controller?.markAsRead(notification.id);
     if (notification.type == NotificationType.application) {
-      Navigator.of(context).pushNamed(AppRoutes.applicationDetails);
+      if (notification.relatedEntityId != null) {
+        Navigator.of(context).pushNamed(
+          AppRoutes.applicationDetails,
+          arguments: notification.relatedEntityId,
+        );
+      } else {
+        Navigator.of(context).pushNamed(AppRoutes.applications);
+      }
+    } else if (notification.type == NotificationType.match ||
+        notification.type == NotificationType.opportunity) {
+      Navigator.of(context).pushNamed(AppRoutes.jobs);
     } else {
-      _message(
-        '${notification.actionLabel ?? 'This action'} is not available in this local preview.',
-      );
+      _message(context, '${notification.actionLabel ?? 'Action'} opened.');
     }
   }
 
-  void _message(String message) => ScaffoldMessenger.of(
+  void _message(BuildContext context, String message) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
 }
@@ -170,9 +241,11 @@ class _FilterTab extends StatelessWidget {
     required this.onTap,
     this.hasDot = false,
   });
+
   final String label;
   final bool selected, hasDot;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
@@ -195,11 +268,6 @@ class _FilterTab extends StatelessWidget {
                 backgroundColor: AppColors.primary,
               ),
             ),
-          if (selected)
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: SizedBox(width: 0),
-            ),
         ],
       ),
     ),
@@ -212,8 +280,10 @@ class _NotificationCard extends StatelessWidget {
     required this.onRead,
     required this.onAction,
   });
+
   final AppNotification notification;
   final VoidCallback onRead, onAction;
+
   @override
   Widget build(BuildContext context) {
     final icon = switch (notification.type) {
@@ -222,7 +292,9 @@ class _NotificationCard extends StatelessWidget {
       NotificationType.application => Icons.visibility_outlined,
       NotificationType.opportunity => Icons.work_outline,
       NotificationType.insight => Icons.insights_outlined,
+      NotificationType.general => Icons.notifications_none,
     };
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppSurface(

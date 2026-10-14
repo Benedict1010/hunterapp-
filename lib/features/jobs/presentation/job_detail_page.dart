@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/application_scope.dart';
 import '../../../app/job_scope.dart';
 import '../../../app/resume_scope.dart';
 import '../../../app/router/app_routes.dart';
@@ -10,6 +12,9 @@ import '../../../core/widgets/app_chips.dart';
 import '../../../core/widgets/app_shell.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/content_widgets.dart';
+import '../../applications/domain/job_application.dart';
+import '../../applications/presentation/application_controller.dart';
+import '../../resume/presentation/resume_controller.dart';
 import '../domain/ai_analysis.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
@@ -65,6 +70,7 @@ class _JobDetailPageState extends State<JobDetailPage> {
   Widget build(BuildContext context) {
     final jobController = JobScope.maybeOf(context);
     final resumeController = ResumeScope.maybeOf(context);
+    final applicationController = ApplicationScope.maybeOf(context);
     final primaryResume = resumeController?.primaryResume;
 
     final job = jobController?.selectedJob;
@@ -266,18 +272,12 @@ class _JobDetailPageState extends State<JobDetailPage> {
                   Expanded(
                     child: PrimaryButton(
                       label: 'Apply Now',
-                      onPressed: () {
-                        final url = job.externalUrl;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              url.isNotEmpty
-                                  ? 'Opening application page: $url'
-                                  : 'External application integration will be implemented later.',
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: () => _showApplyModal(
+                        context,
+                        job,
+                        resumeController,
+                        applicationController,
+                      ),
                     ),
                   ),
                 ],
@@ -286,6 +286,140 @@ class _JobDetailPageState extends State<JobDetailPage> {
         ],
       ),
     );
+  }
+
+  void _showApplyModal(
+    BuildContext context,
+    Job job,
+    ResumeController? resumeController,
+    ApplicationController? applicationController,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Apply to ${job.title}',
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Company: ${job.company}',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (job.externalUrl.isNotEmpty) ...[
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    final uri = Uri.tryParse(job.externalUrl.trim());
+                    if (uri != null &&
+                        (uri.scheme == 'http' || uri.scheme == 'https')) {
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      } catch (_) {}
+                    } else if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Invalid URL: ${job.externalUrl}'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Open External Application URL'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              PrimaryButton(
+                label: 'Confirm & Track Application',
+                leading: const Icon(Icons.check_circle_outline),
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  await _trackApplication(
+                    context,
+                    job,
+                    resumeController,
+                    applicationController,
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _trackApplication(
+    BuildContext context,
+    Job job,
+    ResumeController? resumeController,
+    ApplicationController? applicationController,
+  ) async {
+    if (applicationController == null) return;
+
+    final primaryResume = resumeController?.primaryResume;
+    if (primaryResume == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please upload or select a primary resume before tracking an application.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final versions =
+        await resumeController?.loadVersions(primaryResume.id) ?? [];
+    if (!context.mounted) return;
+    if (versions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No resume version found for primary resume.'),
+        ),
+      );
+      return;
+    }
+
+    final originalVersion = versions.firstWhere(
+      (v) => v.versionType == 'original',
+      orElse: () => versions.first,
+    );
+
+    final app = await applicationController.createApplication(
+      jobId: job.id,
+      resumeVersionId: originalVersion.id,
+      applicationUrl: job.externalUrl.isNotEmpty ? job.externalUrl : null,
+      source: job.source.isNotEmpty ? job.source : null,
+      status: ApplicationStatus.applied,
+    );
+
+    if (context.mounted) {
+      if (app != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Application tracked successfully!')),
+        );
+      } else if (applicationController.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(applicationController.errorMessage!)),
+        );
+      }
+    }
   }
 
   Widget _buildMatchSection({

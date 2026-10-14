@@ -1,72 +1,85 @@
 import '../domain/job_application.dart';
 
-const mockApplications = [
-  JobApplication(
+final mockApplicationList = [
+  Application(
     id: 'abc-senior-engineer',
-    title: 'Senior Software Engineer',
-    company: 'ABC Technologies',
-    location: 'San Francisco, CA',
-    date: 'Oct 24, 2023',
-    matchScore: 94,
+    userId: 'user-1',
+    jobId: 'tech-corp',
+    resumeVersionId: 'ver-1',
     status: ApplicationStatus.applied,
+    applicationUrl: 'https://abctechnologies.com/careers/senior-engineer',
+    source: 'LinkedIn',
+    createdAt: DateTime(2023, 10, 24),
+    updatedAt: DateTime(2023, 10, 24),
+    job: const JobSummary(
+      id: 'tech-corp',
+      title: 'Senior Software Engineer',
+      company: 'ABC Technologies',
+      location: 'San Francisco, CA',
+    ),
+    matchScore: 94,
   ),
-  JobApplication(
+  Application(
     id: 'tech-interview',
-    title: 'Frontend Engineer',
-    company: 'TechFlow Systems',
-    location: 'Remote',
-    date: 'Oct 18, 2023',
+    userId: 'user-1',
+    jobId: 'tech-corp',
+    resumeVersionId: 'ver-1',
+    status: ApplicationStatus.interview,
+    applicationUrl: 'https://techflow.com/careers/frontend',
+    source: 'Unstop',
+    createdAt: DateTime(2023, 10, 18),
+    updatedAt: DateTime(2023, 10, 18),
+    job: const JobSummary(
+      id: 'tech-corp',
+      title: 'Frontend Engineer',
+      company: 'TechFlow Systems',
+      location: 'Remote',
+    ),
     matchScore: 89,
-    status: ApplicationStatus.interviewing,
   ),
-  JobApplication(
+  Application(
     id: 'offer-design',
-    title: 'Product Designer',
-    company: 'DesignStudio',
-    location: 'New York, NY',
-    date: 'Oct 12, 2023',
+    userId: 'user-1',
+    jobId: 'design-studio',
+    resumeVersionId: 'ver-1',
+    status: ApplicationStatus.offer,
+    applicationUrl: 'https://designstudio.com/careers/product-designer',
+    source: 'LinkedIn',
+    createdAt: DateTime(2023, 10, 12),
+    updatedAt: DateTime(2023, 10, 12),
+    job: const JobSummary(
+      id: 'design-studio',
+      title: 'Product Designer',
+      company: 'DesignStudio',
+      location: 'New York, NY',
+    ),
     matchScore: 91,
-    status: ApplicationStatus.offered,
   ),
 ];
 
-const applicationDetail = ApplicationDetail(
-  application: JobApplication(
-    id: 'techflow-senior-frontend',
-    title: 'Senior Frontend Engineer',
-    company: 'TechFlow Systems',
-    location: 'Remote',
-    date: 'Oct 12, 2023',
-    matchScore: 89,
-    status: ApplicationStatus.interviewing,
+final mockTimelineList = [
+  ApplicationTimelineEvent(
+    id: 't-1',
+    applicationId: 'abc-senior-engineer',
+    status: ApplicationStatus.applied,
+    note: 'Application created',
+    createdAt: DateTime(2023, 10, 12),
+    updatedAt: DateTime(2023, 10, 12),
   ),
-  employmentType: 'Full-time',
-  updatedAt: 'Last updated today at 10:32 AM',
-  timeline: [
-    ApplicationTimelineStage(
-      title: 'Application Received',
-      date: 'Oct 12, 2023',
-      status: ApplicationStageStatus.completed,
-    ),
-    ApplicationTimelineStage(
-      title: 'Resume Screened',
-      date: 'Oct 14, 2023',
-      status: ApplicationStageStatus.completed,
-    ),
-    ApplicationTimelineStage(
-      title: 'Technical Assessment',
-      date: 'Oct 18, 2023',
-      status: ApplicationStageStatus.completed,
-    ),
-    ApplicationTimelineStage(
-      title: 'Technical Interview',
-      date: 'Scheduled for Oct 26, 2023',
-      status: ApplicationStageStatus.current,
-    ),
-    ApplicationTimelineStage(
-      title: 'Final Round Panel',
-      date: 'To be determined',
-      status: ApplicationStageStatus.upcoming,
-    ),
-  ],
-);
+  ApplicationTimelineEvent(
+    id: 't-2',
+    applicationId: 'abc-senior-engineer',
+    status: ApplicationStatus.viewed,
+    note: 'Resume Screened',
+    createdAt: DateTime(2023, 10, 14),
+    updatedAt: DateTime(2023, 10, 14),
+  ),
+  ApplicationTimelineEvent(
+    id: 't-3',
+    applicationId: 'abc-senior-engineer',
+    status: ApplicationStatus.interview,
+    note: 'Technical Interview',
+    createdAt: DateTime(2023, 10, 18),
+    updatedAt: DateTime(2023, 10, 18),
+  ),
+];
