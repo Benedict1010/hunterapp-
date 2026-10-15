@@ -147,6 +147,17 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const Divider(),
               SettingsRow(
+                title: 'Job Sources & Connectors',
+                subtitle: 'CONFIGURE PLATFORMS',
+                leading: const Icon(
+                  Icons.hub_outlined,
+                  color: AppColors.primary,
+                ),
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.jobSources),
+              ),
+              const Divider(),
+              SettingsRow(
                 title: 'Preferred Salary Range',
                 subtitle: '\$120K+',
                 leading: const Icon(

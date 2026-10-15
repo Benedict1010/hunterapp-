@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -17,6 +17,8 @@ class JobSource(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     jobs: Mapped[list["Job"]] = relationship(back_populates="source")
 
 

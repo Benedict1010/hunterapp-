@@ -7,6 +7,8 @@ from app.api.routes.resumes import router as resumes_router
 from app.api.routes.matches import router as matches_router
 from app.api.routes.applications import router as applications_router
 from app.api.routes.notifications import router as notifications_router
+from app.api.routes.job_sources import router as job_sources_router
+from app.api.routes.preferences import router as preferences_router
 
 app = FastAPI(title="Hunter API")
 app.include_router(jobs_router)
@@ -16,6 +18,8 @@ app.include_router(resumes_router)
 app.include_router(matches_router)
 app.include_router(applications_router)
 app.include_router(notifications_router)
+app.include_router(job_sources_router)
+app.include_router(preferences_router)
 
 
 @app.get("/health")

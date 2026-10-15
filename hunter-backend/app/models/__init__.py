@@ -1,5 +1,5 @@
 from app.models.job import Job, JobSkill, JobSource
-from app.models.user import User, JobPreference
+from app.models.user import User, JobPreference, UserJobSource
 from app.models.resume import Resume, ResumeVersion, ResumeVersionType
 from app.models.match import JobMatch
 from app.models.application import Application, ApplicationStatus
@@ -12,6 +12,7 @@ __all__ = [
     "JobSource",
     "User",
     "JobPreference",
+    "UserJobSource",
     "Resume",
     "ResumeVersion",
     "ResumeVersionType",

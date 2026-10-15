@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/job_preference_scope.dart';
 import '../../../app/router/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_tokens.dart';
@@ -7,6 +8,8 @@ import '../../../core/widgets/app_buttons.dart';
 import '../../../core/widgets/app_chips.dart';
 import '../../../core/widgets/app_shell.dart';
 import '../../../core/widgets/app_surface.dart';
+import '../domain/job_preference.dart';
+import 'job_preference_controller.dart';
 
 class JobPreferencesPage extends StatefulWidget {
   const JobPreferencesPage({super.key});
@@ -15,172 +18,314 @@ class JobPreferencesPage extends StatefulWidget {
 }
 
 class _JobPreferencesPageState extends State<JobPreferencesPage> {
-  final roles = <String>{'Product Designer', 'Frontend Engineer'};
-  final locations = <String>['Bangalore, KA', 'Mumbai, MH', 'Remote'];
-  var jobType = 'Full-time';
-  var workMode = 'Remote';
-  var salary = 25000.0;
-  var threshold = 85.0;
+  late Set<String> _roles;
+  late List<String> _locations;
+  late String _jobType;
+  late String _workMode;
+  late double _salary;
+  late double _threshold;
+  final TextEditingController _locationController = TextEditingController();
+  bool _initialized = false;
+
   @override
-  Widget build(BuildContext context) => AppShell(
-    navigationVariant: AppNavigationVariant.hunter,
-    selectedIndex: 3,
-    child: Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Set Your Pace',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.displaySmall?.copyWith(fontFamily: 'serif'),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tell AI your career non-negotiables. We handle the discovery.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
+  void initState() {
+    super.initState();
+    _roles = {'Product Designer', 'Frontend Engineer'};
+    _locations = ['Bangalore, KA', 'Mumbai, MH', 'Remote'];
+    _jobType = 'Full-time';
+    _workMode = 'Remote';
+    _salary = 25000.0;
+    _threshold = 85.0;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = JobPreferenceScope.maybeOf(context);
+      if (controller != null &&
+          controller.status == JobPreferenceStateStatus.initial) {
+        controller.loadPreferences().then((_) {
+          if (mounted) _syncFromController(controller);
+        });
+      } else if (controller != null) {
+        _syncFromController(controller);
+      }
+    });
+  }
+
+  void _syncFromController(JobPreferenceController controller) {
+    if (_initialized) return;
+    final pref = controller.preference;
+    setState(() {
+      _roles = Set.from(
+        pref.preferredRoles.isEmpty
+            ? ['Product Designer', 'Frontend Engineer']
+            : pref.preferredRoles,
+      );
+      _locations = List.from(
+        pref.preferredLocations.isEmpty
+            ? ['Bangalore, KA', 'Mumbai, MH', 'Remote']
+            : pref.preferredLocations,
+      );
+      _jobType = pref.jobType ?? 'Full-time';
+      _workMode = pref.workMode ?? 'Remote';
+      _salary = (pref.minSalary ?? 25000).toDouble().clamp(10000.0, 50000.0);
+      _threshold = (pref.minMatchThreshold ?? 85).toDouble().clamp(50.0, 100.0);
+      _initialized = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  void _addLocation() {
+    final text = _locationController.text.trim();
+    if (text.isNotEmpty && !_locations.contains(text)) {
+      setState(() {
+        _locations.add(text);
+        _locationController.clear();
+      });
+    }
+  }
+
+  JobPreference _buildCurrentPreference() => JobPreference(
+    preferredRoles: _roles.toList(),
+    jobType: _jobType,
+    workMode: _workMode,
+    minSalary: _salary.round(),
+    preferredLocations: _locations,
+    minMatchThreshold: _threshold.round(),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = JobPreferenceScope.maybeOf(context);
+
+    return AppShell(
+      navigationVariant: AppNavigationVariant.hunter,
+      selectedIndex: 3,
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Set Your Pace',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.displaySmall?.copyWith(fontFamily: 'serif'),
                   ),
-                ),
-                const Divider(height: 34),
-                const _PreferenceTitle(
-                  icon: Icons.business_center_outlined,
-                  title: 'Desired Roles',
-                  subtitle: 'Select the titles that match your expertise.',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      [
-                            'Product Designer',
-                            'Frontend Engineer',
-                            'Backend Dev',
-                            'Fullstack',
-                            'Data Scientist',
-                            'DevOps',
-                            'Mobile Developer',
-                          ]
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tell AI your career non-negotiables. We handle the discovery.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const Divider(height: 34),
+                  if (controller != null && controller.isLoading) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    const Center(child: CircularProgressIndicator()),
+                    const SizedBox(height: AppSpacing.xl),
+                  ] else ...[
+                    if (controller != null && controller.hasError) ...[
+                      AppSurface(
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.warning,
+                              size: 36,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              controller.errorMessage ??
+                                  'Failed to load preferences.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            ElevatedButton.icon(
+                              onPressed: () => controller.loadPreferences(),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    const _PreferenceTitle(
+                      icon: Icons.business_center_outlined,
+                      title: 'Desired Roles',
+                      subtitle: 'Select the titles that match your expertise.',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          [
+                                'Product Designer',
+                                'Frontend Engineer',
+                                'Backend Dev',
+                                'Fullstack',
+                                'Data Scientist',
+                                'DevOps',
+                                'Mobile Developer',
+                              ]
+                              .map(
+                                (role) => PillChip(
+                                  label: role,
+                                  selected: _roles.contains(role),
+                                  onSelected: (value) => setState(
+                                    () => value
+                                        ? _roles.add(role)
+                                        : _roles.remove(role),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                    ),
+                    const Divider(height: 42),
+                    const _PreferenceTitle(
+                      icon: Icons.track_changes_outlined,
+                      title: 'Job Type',
+                      subtitle: 'What kind of commitment are you looking for?',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _OptionTiles(
+                      options: const [
+                        ('Full-time', Icons.business_center_outlined),
+                        ('Internship', Icons.public_outlined),
+                        ('Contract', Icons.apartment_outlined),
+                      ],
+                      selected: _jobType,
+                      onSelected: (value) => setState(() => _jobType = value),
+                    ),
+                    const Divider(height: 42),
+                    const _PreferenceTitle(
+                      icon: Icons.laptop_mac_outlined,
+                      title: 'Work Mode',
+                      subtitle: 'Where do you do your best work?',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _OptionTiles(
+                      options: const [
+                        ('Remote', Icons.public_outlined),
+                        ('Hybrid', Icons.apartment_outlined),
+                        ('On-site', Icons.location_on_outlined),
+                      ],
+                      selected: _workMode,
+                      onSelected: (value) => setState(() => _workMode = value),
+                    ),
+                    const Divider(height: 42),
+                    const _PreferenceTitle(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'Expected Stipend/Salary',
+                      subtitle: 'Adjust your minimum monthly expectations.',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _SalaryCard(
+                      value: _salary,
+                      onChanged: (value) => setState(() => _salary = value),
+                    ),
+                    const Divider(height: 42),
+                    const _PreferenceTitle(
+                      icon: Icons.location_on_outlined,
+                      title: 'Preferred Locations',
+                      subtitle: 'Where should we look for opportunities?',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _locations
                           .map(
-                            (role) => PillChip(
-                              label: role,
-                              selected: roles.contains(role),
-                              onSelected: (value) => setState(
-                                () => value
-                                    ? roles.add(role)
-                                    : roles.remove(role),
-                              ),
+                            (location) => InputChip(
+                              label: Text(location),
+                              onDeleted: () =>
+                                  setState(() => _locations.remove(location)),
                             ),
                           )
-                          .toList()
-                        ..add(const PillChip(label: '+ Custom')),
-                ),
-                const Divider(height: 42),
-                const _PreferenceTitle(
-                  icon: Icons.track_changes_outlined,
-                  title: 'Job Type',
-                  subtitle: 'What kind of commitment are you looking for?',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _OptionTiles(
-                  options: const [
-                    ('Full-time', Icons.business_center_outlined),
-                    ('Internship', Icons.public_outlined),
-                    ('Contract', Icons.apartment_outlined),
-                  ],
-                  selected: jobType,
-                  onSelected: (value) => setState(() => jobType = value),
-                ),
-                const Divider(height: 42),
-                const _PreferenceTitle(
-                  icon: Icons.laptop_mac_outlined,
-                  title: 'Work Mode',
-                  subtitle: 'Where do you do your best work?',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _OptionTiles(
-                  options: const [
-                    ('Remote', Icons.public_outlined),
-                    ('Hybrid', Icons.apartment_outlined),
-                    ('On-site', Icons.location_on_outlined),
-                  ],
-                  selected: workMode,
-                  onSelected: (value) => setState(() => workMode = value),
-                ),
-                const Divider(height: 42),
-                const _PreferenceTitle(
-                  icon: Icons.account_balance_wallet_outlined,
-                  title: 'Expected Stipend/Salary',
-                  subtitle: 'Adjust your minimum monthly expectations.',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _SalaryCard(
-                  value: salary,
-                  onChanged: (value) => setState(() => salary = value),
-                ),
-                const Divider(height: 42),
-                const _PreferenceTitle(
-                  icon: Icons.location_on_outlined,
-                  title: 'Preferred Locations',
-                  subtitle: 'Where should we look for opportunities?',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: locations
-                      .map(
-                        (location) => InputChip(
-                          label: Text(location),
-                          onDeleted: () =>
-                              setState(() => locations.remove(location)),
+                          .toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      controller: _locationController,
+                      onSubmitted: (_) => _addLocation(),
+                      decoration: InputDecoration(
+                        hintText: 'Add another city...',
+                        prefixIcon: const Icon(Icons.location_on_outlined),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: _addLocation,
                         ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Add another city...',
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                  ),
-                ),
-                const Divider(height: 42),
-                const _PreferenceTitle(
-                  icon: Icons.check,
-                  title: 'Match Threshold',
-                  subtitle:
-                      'Only see jobs that align closely with your profile.',
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _ThresholdCard(
-                  value: threshold,
-                  onChanged: (value) => setState(() => threshold = value),
-                ),
-              ],
+                      ),
+                    ),
+                    const Divider(height: 42),
+                    const _PreferenceTitle(
+                      icon: Icons.check,
+                      title: 'Match Threshold',
+                      subtitle:
+                          'Only see jobs that align closely with your profile.',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _ThresholdCard(
+                      value: _threshold,
+                      onChanged: (value) => setState(() => _threshold = value),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(top: BorderSide(color: AppColors.border)),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: PrimaryButton(
+              label: controller != null && controller.isSaving
+                  ? 'Saving...'
+                  : 'Save Preferences',
+              trailing: const Icon(Icons.arrow_forward_rounded),
+              onPressed: controller != null && controller.isSaving
+                  ? null
+                  : () async {
+                      if (controller != null) {
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        controller.updateLocalPreference(
+                          _buildCurrentPreference(),
+                        );
+                        final success = await controller.savePreferences();
+                        if (success && mounted) {
+                          navigator.pushNamed(AppRoutes.home);
+                        } else if (mounted && controller.hasError) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                controller.errorMessage ??
+                                    'Failed to save preferences.',
+                              ),
+                            ),
+                          );
+                        }
+                      } else {
+                        Navigator.of(context).pushNamed(AppRoutes.home);
+                      }
+                    },
+            ),
           ),
-          child: PrimaryButton(
-            label: 'Save Preferences',
-            trailing: const Icon(Icons.arrow_forward_rounded),
-            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.home),
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _PreferenceTitle extends StatelessWidget {
