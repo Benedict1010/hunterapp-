@@ -59,3 +59,22 @@ class ResumeVersion {
     'updated_at': updatedAt.toIso8601String(),
   };
 }
+
+ResumeVersion? findNewTailoredResumeVersion({
+  required Iterable<ResumeVersion> existingVersions,
+  required Iterable<ResumeVersion> refreshedVersions,
+  required String jobId,
+  required String contentText,
+}) {
+  final existingIds = existingVersions.map((version) => version.id).toSet();
+  final candidates = refreshedVersions
+      .where(
+        (version) =>
+            !existingIds.contains(version.id) &&
+            version.versionType == 'tailored' &&
+            version.jobId == jobId &&
+            version.contentText == contentText,
+      )
+      .toList();
+  return candidates.length == 1 ? candidates.single : null;
+}

@@ -4,6 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../data/job_service.dart';
 import '../data/mock_jobs.dart';
 import '../domain/ai_analysis.dart';
+import '../domain/ai_tailoring.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
 
@@ -15,6 +16,8 @@ enum MatchStateStatus { initial, loading, loaded, error }
 
 enum AnalysisStateStatus { initial, loading, loaded, error }
 
+enum TailoringStateStatus { initial, loading, loaded, error }
+
 class JobController extends ChangeNotifier {
   final JobService jobService;
 
@@ -22,17 +25,20 @@ class JobController extends ChangeNotifier {
   JobDetailStatus _detailStatus = JobDetailStatus.loaded;
   MatchStateStatus _matchStatus = MatchStateStatus.initial;
   AnalysisStateStatus _analysisStatus = AnalysisStateStatus.initial;
+  TailoringStateStatus _tailoringStatus = TailoringStateStatus.initial;
 
   List<Job> _jobs;
   int _totalJobs;
   Job? _selectedJob;
   JobMatch? _currentMatch;
   AiAnalysis? _currentAnalysis;
+  AiTailoring? _currentTailoring;
   final Map<String, JobMatch> _matchesByJobId = {};
 
   String? _errorMessage;
   String? _matchErrorMessage;
   String? _analysisErrorMessage;
+  String? _tailoringErrorMessage;
 
   JobController({
     required this.jobService,
@@ -49,22 +55,26 @@ class JobController extends ChangeNotifier {
   JobDetailStatus get detailStatus => _detailStatus;
   MatchStateStatus get matchStatus => _matchStatus;
   AnalysisStateStatus get analysisStatus => _analysisStatus;
+  TailoringStateStatus get tailoringStatus => _tailoringStatus;
 
   List<Job> get jobs => List.unmodifiable(_jobs);
   int get totalJobs => _totalJobs;
   Job? get selectedJob => _selectedJob;
   JobMatch? get currentMatch => _currentMatch;
   AiAnalysis? get currentAnalysis => _currentAnalysis;
+  AiTailoring? get currentTailoring => _currentTailoring;
   Map<String, JobMatch> get matchesByJobId => Map.unmodifiable(_matchesByJobId);
 
   String? get errorMessage => _errorMessage;
   String? get matchErrorMessage => _matchErrorMessage;
   String? get analysisErrorMessage => _analysisErrorMessage;
+  String? get tailoringErrorMessage => _tailoringErrorMessage;
 
   bool get isLoadingJobs => _status == JobStateStatus.loading;
   bool get isLoadingDetail => _detailStatus == JobDetailStatus.loading;
   bool get isCalculatingMatch => _matchStatus == MatchStateStatus.loading;
   bool get isAnalyzing => _analysisStatus == AnalysisStateStatus.loading;
+  bool get isTailoring => _tailoringStatus == TailoringStateStatus.loading;
 
   bool get hasError => _status == JobStateStatus.error;
 
@@ -76,6 +86,8 @@ class JobController extends ChangeNotifier {
         ? MatchStateStatus.loaded
         : MatchStateStatus.initial;
     _analysisStatus = AnalysisStateStatus.initial;
+    _tailoringStatus = TailoringStateStatus.initial;
+    _currentTailoring = null;
     notifyListeners();
   }
 
@@ -83,6 +95,7 @@ class JobController extends ChangeNotifier {
     _errorMessage = null;
     _matchErrorMessage = null;
     _analysisErrorMessage = null;
+    _tailoringErrorMessage = null;
     if (_status == JobStateStatus.error) {
       _status = JobStateStatus.loaded;
     }
@@ -237,6 +250,36 @@ class JobController extends ChangeNotifier {
     } catch (e) {
       _analysisErrorMessage = 'Failed to run AI job analysis.';
       _analysisStatus = AnalysisStateStatus.error;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<AiTailoring?> tailorResume({
+    required String jobId,
+    required String resumeId,
+  }) async {
+    _tailoringStatus = TailoringStateStatus.loading;
+    _tailoringErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final tailoring = await jobService.tailorResume(
+        jobId: jobId,
+        resumeId: resumeId,
+      );
+      _currentTailoring = tailoring;
+      _tailoringStatus = TailoringStateStatus.loaded;
+      notifyListeners();
+      return tailoring;
+    } on ApiException catch (e) {
+      _tailoringErrorMessage = e.userFriendlyMessage;
+      _tailoringStatus = TailoringStateStatus.error;
+      notifyListeners();
+      return null;
+    } catch (_) {
+      _tailoringErrorMessage = 'Failed to tailor resume.';
+      _tailoringStatus = TailoringStateStatus.error;
       notifyListeners();
       return null;
     }

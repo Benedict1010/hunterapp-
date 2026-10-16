@@ -14,6 +14,7 @@ import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/content_widgets.dart';
 import '../../applications/domain/job_application.dart';
 import '../../applications/presentation/application_controller.dart';
+import '../../resume/domain/resume_version.dart';
 import '../../resume/presentation/resume_controller.dart';
 import '../domain/ai_analysis.dart';
 import '../domain/job.dart';
@@ -29,6 +30,8 @@ class JobDetailPage extends StatefulWidget {
 
 class _JobDetailPageState extends State<JobDetailPage> {
   var saved = false;
+  var _isPreparingTailoring = false;
+  String? _tailoredResumeVersionId;
 
   @override
   void initState() {
@@ -263,9 +266,16 @@ class _JobDetailPageState extends State<JobDetailPage> {
                     child: SecondaryOutlinedButton(
                       label: 'Tailor Resume',
                       leading: const Icon(Icons.auto_awesome_outlined),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pushNamed(AppRoutes.optimizationReady),
+                      onPressed: jobController?.isTailoring == true ||
+                              _isPreparingTailoring
+                          ? null
+                          : () => _tailorResume(
+                              context,
+                              job,
+                              primaryResume?.id,
+                              jobController,
+                              resumeController,
+                            ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -286,6 +296,103 @@ class _JobDetailPageState extends State<JobDetailPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _tailorResume(
+    BuildContext context,
+    Job job,
+    String? resumeId,
+    JobController? jobController,
+    ResumeController? resumeController,
+  ) async {
+    if (_isPreparingTailoring) return;
+    setState(() => _isPreparingTailoring = true);
+    _tailoredResumeVersionId = null;
+    try {
+      if (resumeId == null || jobController == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload a primary resume before tailoring.'),
+          ),
+        );
+        return;
+      }
+      if (resumeController == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to verify the tailored resume version.'),
+          ),
+        );
+        return;
+      }
+
+      final existingVersions = await resumeController.loadVersions(resumeId);
+      if (!context.mounted) return;
+      if (resumeController.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              resumeController.errorMessage ??
+                  'Unable to verify the tailored resume version.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final tailoring = await jobController.tailorResume(
+        jobId: job.id,
+        resumeId: resumeId,
+      );
+      if (!context.mounted) return;
+      if (tailoring == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              jobController.tailoringErrorMessage ?? 'Failed to tailor resume.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final versions = await resumeController.loadVersions(resumeId);
+      if (!context.mounted) return;
+      if (resumeController.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              resumeController.errorMessage ??
+                  'Unable to verify the tailored resume version.',
+            ),
+          ),
+        );
+        return;
+      }
+      final persistedVersion = findNewTailoredResumeVersion(
+        existingVersions: existingVersions,
+        refreshedVersions: versions,
+        jobId: job.id,
+        contentText: tailoring.tailoredResume,
+      );
+      if (persistedVersion == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tailored resume could not be verified. Please try again.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      _tailoredResumeVersionId = persistedVersion.id;
+      Navigator.of(context).pushNamed(AppRoutes.tailoredResume);
+    } finally {
+      if (mounted) {
+        setState(() => _isPreparingTailoring = false);
+      }
+    }
   }
 
   void _showApplyModal(
@@ -354,6 +461,7 @@ class _JobDetailPageState extends State<JobDetailPage> {
                     job,
                     resumeController,
                     applicationController,
+                    _tailoredResumeVersionId,
                   );
                 },
               ),
@@ -369,6 +477,7 @@ class _JobDetailPageState extends State<JobDetailPage> {
     Job job,
     ResumeController? resumeController,
     ApplicationController? applicationController,
+    String? tailoredResumeVersionId,
   ) async {
     if (applicationController == null) return;
 
@@ -396,14 +505,35 @@ class _JobDetailPageState extends State<JobDetailPage> {
       return;
     }
 
-    final originalVersion = versions.firstWhere(
-      (v) => v.versionType == 'original',
+    final intendedTailoredVersion = tailoredResumeVersionId == null
+        ? null
+        : versions
+            .where(
+              (version) =>
+                  version.id == tailoredResumeVersionId &&
+                  version.versionType == 'tailored' &&
+                  version.jobId == job.id,
+            )
+            .firstOrNull;
+    if (tailoredResumeVersionId != null && intendedTailoredVersion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The tailored resume version is no longer available. Please tailor again.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final resumeVersion = intendedTailoredVersion ?? versions.firstWhere(
+      (version) => version.versionType == 'original',
       orElse: () => versions.first,
     );
 
     final app = await applicationController.createApplication(
       jobId: job.id,
-      resumeVersionId: originalVersion.id,
+      resumeVersionId: resumeVersion.id,
       applicationUrl: job.externalUrl.isNotEmpty ? job.externalUrl : null,
       source: job.source.isNotEmpty ? job.source : null,
       status: ApplicationStatus.applied,

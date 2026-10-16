@@ -75,6 +75,30 @@ void main() {
       expect(controller.isSelected('src-1'), isTrue);
     });
 
+    test('loadSources does not imply saved selections when signed out', () async {
+      tokenStorage = InMemoryTokenStorage(null);
+      final apiClient = ApiClient(
+        apiConfig: const ApiConfig(),
+        tokenStorage: tokenStorage,
+        client: MockHttpClient(
+          (_) async => http.Response(
+            jsonEncode([
+              {'id': 'src-1', 'name': 'LinkedIn', 'is_available': false},
+            ]),
+            200,
+          ),
+        ),
+      );
+      final controller = JobSourceController(
+        jobSourceService: JobSourceService(apiClient: apiClient),
+      );
+
+      await controller.loadSources();
+
+      expect(controller.status, JobSourceStateStatus.loaded);
+      expect(controller.selectedIds, isEmpty);
+    });
+
     test('saveSelections persists selection to backend', () async {
       final mockClient = MockHttpClient((request) async {
         if (request.method == 'PUT' &&

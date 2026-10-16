@@ -5,6 +5,7 @@ import 'package:hunter/core/network/api_exception.dart';
 import 'package:hunter/core/storage/token_storage.dart';
 import 'package:hunter/features/jobs/data/job_service.dart';
 import 'package:hunter/features/jobs/domain/ai_analysis.dart';
+import 'package:hunter/features/jobs/domain/ai_tailoring.dart';
 import 'package:hunter/features/jobs/domain/job.dart';
 import 'package:hunter/features/jobs/domain/job_match.dart';
 import 'package:hunter/features/jobs/presentation/job_controller.dart';
@@ -46,6 +47,12 @@ class FakeJobService implements JobService {
     strengths: ['Flutter'],
     missingSkills: [],
     recommendations: ['Keep coding'],
+  );
+
+  AiTailoring mockTailoring = const AiTailoring(
+    tailoredResume: 'Tailored Flutter resume',
+    changesMade: ['Refined summary'],
+    warnings: [],
   );
 
   @override
@@ -129,6 +136,21 @@ class FakeJobService implements JobService {
     }
     return mockAnalysis;
   }
+
+  @override
+  Future<AiTailoring> tailorResume({
+    required String jobId,
+    required String resumeId,
+  }) async {
+    if (shouldFail) {
+      throw const ApiException(
+        type: ApiErrorType.serverError,
+        message: 'Tailoring failed',
+        statusCode: 500,
+      );
+    }
+    return mockTailoring;
+  }
 }
 
 void main() {
@@ -202,6 +224,17 @@ void main() {
       expect(controller.analysisStatus, AnalysisStateStatus.loaded);
       expect(analysis, isNotNull);
       expect(controller.currentAnalysis?.summary, 'Great fit');
+    });
+
+    test('tailorResume stores a response from the backend contract', () async {
+      final tailoring = await controller.tailorResume(
+        jobId: 'job-1',
+        resumeId: 'r1',
+      );
+
+      expect(controller.tailoringStatus, TailoringStateStatus.loaded);
+      expect(tailoring?.tailoredResume, 'Tailored Flutter resume');
+      expect(controller.currentTailoring?.changesMade, ['Refined summary']);
     });
   });
 }

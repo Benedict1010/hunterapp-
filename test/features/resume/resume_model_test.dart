@@ -117,5 +117,56 @@ void main() {
       expect(version.changesMade, isNull);
       expect(version.warnings, isNull);
     });
+
+    test('findNewTailoredResumeVersion requires a new matching job version', () {
+      final original = ResumeVersion(
+        id: 'original',
+        resumeId: 'resume-1',
+        userId: 'user-1',
+        versionType: 'original',
+        contentText: 'Original content',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      final priorTailored = ResumeVersion(
+        id: 'prior-tailored',
+        resumeId: 'resume-1',
+        userId: 'user-1',
+        jobId: 'job-1',
+        versionType: 'tailored',
+        contentText: 'Tailored content',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      final newTailored = ResumeVersion(
+        id: 'new-tailored',
+        resumeId: 'resume-1',
+        userId: 'user-1',
+        jobId: 'job-1',
+        versionType: 'tailored',
+        contentText: 'Tailored content',
+        createdAt: DateTime(2026, 1, 2),
+        updatedAt: DateTime(2026, 1, 2),
+      );
+
+      expect(
+        findNewTailoredResumeVersion(
+          existingVersions: [original, priorTailored],
+          refreshedVersions: [original, priorTailored, newTailored],
+          jobId: 'job-1',
+          contentText: 'Tailored content',
+        )?.id,
+        'new-tailored',
+      );
+      expect(
+        findNewTailoredResumeVersion(
+          existingVersions: [original, priorTailored],
+          refreshedVersions: [original, priorTailored, newTailored],
+          jobId: 'job-2',
+          contentText: 'Tailored content',
+        ),
+        isNull,
+      );
+    });
   });
 }

@@ -168,5 +168,39 @@ void main() {
       expect(analysis.strengths, contains('Strong Dart knowledge'));
       expect(analysis.rawScore, equals(88.0));
     });
+
+    test('tailorResume sends POST /matches/jobs/{job_id}/tailor', () async {
+      final mockClient = MockHttpClient((request) async {
+        expect(request.method, equals('POST'));
+        expect(request.url.path, equals('/matches/jobs/job-123/tailor'));
+        final body =
+            jsonDecode((request as http.Request).body) as Map<String, dynamic>;
+        expect(body['resume_id'], equals('res-456'));
+
+        return http.Response(
+          jsonEncode({
+            'tailored_resume': 'Tailored resume text.',
+            'changes_made': ['Refined summary'],
+            'warnings': ['Verify all claims'],
+          }),
+          200,
+        );
+      });
+      final service = JobService(
+        apiClient: ApiClient(
+          apiConfig: const ApiConfig(),
+          tokenStorage: tokenStorage,
+          client: mockClient,
+        ),
+      );
+
+      final tailoring = await service.tailorResume(
+        jobId: 'job-123',
+        resumeId: 'res-456',
+      );
+
+      expect(tailoring.tailoredResume, 'Tailored resume text.');
+      expect(tailoring.changesMade, ['Refined summary']);
+    });
   });
 }

@@ -17,7 +17,7 @@ class JobSourcesPage extends StatefulWidget {
 }
 
 class _JobSourcesPageState extends State<JobSourcesPage> {
-  final fallbackSelected = <String>{'LinkedIn', 'Unstop'};
+  final fallbackSelected = <String>{};
   final fallbackPlatforms = const [
     _Platform(
       'LinkedIn',
@@ -146,9 +146,9 @@ class _JobSourcesPageState extends State<JobSourcesPage> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   const InfoCallout(
-                    title: 'Smart Scanning Enabled',
+                    title: 'Source preferences',
                     message:
-                        'Our AI will automatically sync with your selected sources to track applications and match scores in real-time.',
+                        'Your selection is saved to your account. Only sources marked Available can currently provide jobs; external sources are not automatically synchronized.',
                     icon: Icons.search,
                   ),
                   const SizedBox(height: AppSpacing.lg),

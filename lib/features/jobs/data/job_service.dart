@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../domain/ai_analysis.dart';
+import '../domain/ai_tailoring.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
 
@@ -66,5 +67,16 @@ class JobService {
       body: {'resume_id': resumeId},
     );
     return AiAnalysis.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<AiTailoring> tailorResume({
+    required String jobId,
+    required String resumeId,
+  }) async {
+    final response = await apiClient.post(
+      '/matches/jobs/$jobId/tailor',
+      body: {'resume_id': resumeId},
+    );
+    return AiTailoring.fromJson(response as Map<String, dynamic>);
   }
 }

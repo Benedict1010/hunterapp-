@@ -82,11 +82,7 @@ class JobSourceController extends ChangeNotifier {
         final selected = await jobSourceService.fetchSelectedSourceIds();
         _selectedIds = selected.toSet();
       } else {
-        // Unauthenticated default state: select default sources if any or empty
-        _selectedIds = available
-            .where((s) => s.name == 'LinkedIn' || s.name == 'Unstop')
-            .map((s) => s.id)
-            .toSet();
+        _selectedIds = {};
       }
       _status = JobSourceStateStatus.loaded;
     } on ApiException catch (e) {

@@ -57,9 +57,7 @@ class _JobsForYouPageState extends State<JobsForYouPage> {
           job.title.toLowerCase().contains('design') ||
               job.title.toLowerCase().contains('ui') ||
               job.title.toLowerCase().contains('product'),
-        'Remote' =>
-          (job.jobType?.toLowerCase().contains('remote') ?? false) ||
-              (job.location?.toLowerCase().contains('remote') ?? false),
+        'Remote' => job.location?.toLowerCase().contains('remote') ?? false,
         'Over \$120K' =>
           job.salaryRange != null &&
               (job.salaryRange!.contains('120') ||
