@@ -3,16 +3,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hunter/app/app.dart';
 import 'package:hunter/core/network/api_client.dart';
 import 'package:hunter/core/storage/token_storage.dart';
+import 'package:hunter/features/jobs/data/job_service.dart';
+import 'package:hunter/features/jobs/domain/ai_tailoring.dart';
+import 'package:hunter/features/jobs/presentation/job_controller.dart';
 import 'package:hunter/features/resume/data/resume_service.dart';
 import 'package:hunter/features/resume/presentation/resume_controller.dart';
 
 void main() {
-  Widget buildTestApp() {
+  Widget buildTestApp({JobController? jobController}) {
     final tokenStorage = InMemoryTokenStorage();
     final apiClient = ApiClient(tokenStorage: tokenStorage);
     final resumeService = ResumeService(apiClient: apiClient);
     final resumeController = ResumeController(resumeService: resumeService);
-    return AiJobHunterApp(resumeController: resumeController);
+    final jobService = JobService(apiClient: apiClient);
+    final effectiveJobController =
+        jobController ??
+        JobController(
+          jobService: jobService,
+          initialTailoring: const AiTailoring(
+            tailoredResume: 'Tailored resume content for widget test.',
+            changesMade: ['Highlighted key skills and experience'],
+            warnings: [],
+          ),
+        );
+    return AiJobHunterApp(
+      resumeController: resumeController,
+      jobController: effectiveJobController,
+    );
   }
 
   testWidgets('landing starts the supplied onboarding flow', (tester) async {

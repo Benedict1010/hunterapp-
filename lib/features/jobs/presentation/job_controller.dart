@@ -44,11 +44,13 @@ class JobController extends ChangeNotifier {
     required this.jobService,
     List<Job>? initialJobs,
     JobStateStatus initialStatus = JobStateStatus.loaded,
+    AiTailoring? initialTailoring,
   }) : _jobs = initialJobs ?? List.of(defaultMockJobs),
        _totalJobs = (initialJobs ?? defaultMockJobs).length,
        _selectedJob = (initialJobs ?? defaultMockJobs).isNotEmpty
            ? (initialJobs ?? defaultMockJobs).first
            : null,
+       _currentTailoring = initialTailoring,
        _status = initialStatus;
 
   JobStateStatus get status => _status;
