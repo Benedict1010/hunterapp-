@@ -7,8 +7,9 @@ from app.services.job_sources.base import JobSourceAdapter
 class MockJobSource(JobSourceAdapter):
     """Deterministic development fixture; it performs no network requests."""
 
-    name = "Mock Campus"
-    base_url = "https://mock-campus.example"
+    name = "Mock Job Source"
+    base_url = "https://mockjobs.example.com"
+    aliases = ("Mock Campus", "https://mock-campus.example")
 
     def fetch_jobs(self) -> Iterable[Mapping[str, Any]]:
         return [
@@ -23,8 +24,9 @@ class MockJobSource(JobSourceAdapter):
 class MockPartnerJobSource(JobSourceAdapter):
     """Second mock source containing one cross-source duplicate listing."""
 
-    name = "Mock Partner Board"
-    base_url = "https://mock-partner.example"
+    name = "Mock Partner Source"
+    base_url = "https://partner.example.com"
+    aliases = ("Mock Partner Board", "https://mock-partner.example")
 
     def fetch_jobs(self) -> Iterable[Mapping[str, Any]]:
         return [{"position": "Backend Developer", "employer": "Data Harbor", "place": "Pune, India", "description_text": "Design APIs and data pipelines for analytics products.", "apply_url": "https://mock-partner.example/listings/data-harbor-backend", "kind": "Full-time", "skills": ["Python", "FastAPI", "SQLAlchemy"]}]

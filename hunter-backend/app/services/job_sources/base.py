@@ -8,6 +8,7 @@ class JobSourceAdapter(ABC):
 
     name: str
     base_url: str | None = None
+    aliases: tuple[str, ...] = ()
 
     @abstractmethod
     def fetch_jobs(self) -> Iterable[Mapping[str, Any]]:

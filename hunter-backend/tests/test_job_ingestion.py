@@ -54,5 +54,5 @@ def test_job_api_and_mock_ingestion_endpoint(client):
     assert body["items"][0]["title"] == "Backend Developer"
     job = client.get(f"/jobs/{body['items'][0]['id']}")
     assert job.status_code == 200
-    assert job.json()["source"] == "Mock Campus"
+    assert job.json()["source"] == "Mock Job Source"
     assert job.json()["skills"]

@@ -51,10 +51,24 @@ class JobIngestionService:
                 result.skipped_duplicates += 1
                 continue
             if source is None:
-                source = self.database.scalar(select(JobSource).where(JobSource.name == adapter.name))
+                aliases = getattr(adapter, "aliases", ())
+                source = self.database.scalar(
+                    select(JobSource).where(
+                        (JobSource.name == adapter.name)
+                        | (JobSource.base_url == adapter.base_url)
+                        | (JobSource.name.in_(aliases))
+                        | (JobSource.base_url.in_(aliases))
+                    )
+                )
                 if source is None:
-                    source = JobSource(name=adapter.name, base_url=adapter.base_url)
+                    source = JobSource(name=adapter.name, base_url=adapter.base_url, is_available=True)
                     self.database.add(source)
+                    self.database.flush()
+                else:
+                    if adapter.base_url and not source.base_url:
+                        source.base_url = adapter.base_url
+                    if not source.is_available:
+                        source.is_available = True
                     self.database.flush()
             job = Job(title=normalized.title, company=normalized.company, location=normalized.location, description=normalized.description, salary_range=normalized.salary_range, job_type=normalized.job_type, external_url=normalized.external_url, deduplication_key=key, posted_at=normalized.posted_at, source=source)
             job.skills = [JobSkill(name=skill) for skill in normalized.skills]
