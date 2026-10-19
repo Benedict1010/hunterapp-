@@ -66,6 +66,41 @@ void main() {
       expect(controller.primaryResume?.id, equals('res_2'));
     });
 
+    test(
+      'primaryResume returns null if no resume is designated primary',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 'res_1',
+                'user_id': 'usr_1',
+                'filename': 'first.pdf',
+                'file_url': 'first.pdf',
+                'content_text': 'Content 1',
+                'is_primary': false,
+                'created_at': '2026-09-22T10:00:00Z',
+                'updated_at': '2026-09-22T10:00:00Z',
+              },
+            ]),
+            200,
+          );
+        });
+
+        final apiClient = ApiClient(
+          apiConfig: const ApiConfig(),
+          client: mockClient,
+        );
+        final service = ResumeService(apiClient: apiClient);
+        final controller = ResumeController(resumeService: service);
+
+        await controller.loadResumes();
+
+        expect(controller.resumes.length, equals(1));
+        expect(controller.primaryResume, isNull);
+      },
+    );
+
     test('uploadResume handles success and reloads resumes', () async {
       final mockClient = MockHttpClient((request) async {
         if (request.method == 'POST' && request.url.path == '/resumes') {

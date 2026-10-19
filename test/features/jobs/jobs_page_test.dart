@@ -93,4 +93,37 @@ void main() {
     expect(find.text('Flutter Engineer'), findsOneWidget);
     expect(find.text('AppCo'), findsOneWidget);
   });
+
+  testWidgets('JobsForYouPage does not display salary filter Over \$120K', (
+    tester,
+  ) async {
+    final fakeJobService = FakeJobService();
+    final jobController = JobController(
+      jobService: fakeJobService,
+      initialJobs: fakeJobService.mockJobs,
+    );
+    final resumeController = ResumeController(
+      resumeService: FakeResumeService(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: JobScope(
+          controller: jobController,
+          child: ResumeScope(
+            controller: resumeController,
+            child: const JobsForYouPage(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Over \$120K'), findsNothing);
+    expect(find.text('All Matches'), findsOneWidget);
+    expect(find.text('Design'), findsOneWidget);
+    expect(find.text('Remote'), findsOneWidget);
+  });
 }

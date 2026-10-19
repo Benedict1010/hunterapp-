@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/job_scope.dart';
+import '../../../app/resume_scope.dart';
 import '../../../app/router/app_routes.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_tokens.dart';
@@ -29,11 +30,14 @@ class _JobsForYouPageState extends State<JobsForYouPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final controller = JobScope.maybeOf(context);
+      final resumeController = ResumeScope.maybeOf(context);
       if (controller != null) {
         if (controller.status == JobStateStatus.initial) {
           controller.loadJobs();
         }
-        controller.loadUserMatches();
+        controller.loadUserMatches(
+          primaryResumeId: resumeController?.primaryResume?.id,
+        );
       }
     });
   }
@@ -58,10 +62,6 @@ class _JobsForYouPageState extends State<JobsForYouPage> {
               job.title.toLowerCase().contains('ui') ||
               job.title.toLowerCase().contains('product'),
         'Remote' => job.location?.toLowerCase().contains('remote') ?? false,
-        'Over \$120K' =>
-          job.salaryRange != null &&
-              (job.salaryRange!.contains('120') ||
-                  job.salaryRange!.contains('150')),
         _ => true,
       };
 
@@ -87,8 +87,11 @@ class _JobsForYouPageState extends State<JobsForYouPage> {
       child: RefreshIndicator(
         onRefresh: () async {
           if (controller != null) {
+            final resumeController = ResumeScope.maybeOf(context);
             await controller.loadJobs();
-            await controller.loadUserMatches();
+            await controller.loadUserMatches(
+              primaryResumeId: resumeController?.primaryResume?.id,
+            );
           }
         },
         child: ListView(
@@ -132,7 +135,7 @@ class _JobsForYouPageState extends State<JobsForYouPage> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: ['All Matches', 'Design', 'Remote', 'Over \$120K']
+                children: ['All Matches', 'Design', 'Remote']
                     .map(
                       (filter) => Padding(
                         padding: const EdgeInsets.only(right: 8),

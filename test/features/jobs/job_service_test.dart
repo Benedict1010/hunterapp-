@@ -60,6 +60,59 @@ void main() {
       expect(response.items.first.company, equals('TechCorp'));
     });
 
+    test(
+      'listJobs serializes use_saved_preferences=true when requested',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          expect(request.url.path, equals('/jobs'));
+          expect(
+            request.url.queryParameters['use_saved_preferences'],
+            equals('true'),
+          );
+
+          return http.Response(
+            jsonEncode({'items': [], 'total': 0, 'limit': 20, 'offset': 0}),
+            200,
+          );
+        });
+
+        final apiClient = ApiClient(
+          apiConfig: const ApiConfig(),
+          tokenStorage: tokenStorage,
+          client: mockClient,
+        );
+        final service = JobService(apiClient: apiClient);
+
+        final response = await service.listJobs(useSavedPreferences: true);
+        expect(response.total, equals(0));
+      },
+    );
+
+    test('public listJobs does not include use_saved_preferences', () async {
+      final mockClient = MockHttpClient((request) async {
+        expect(request.url.path, equals('/jobs'));
+        expect(
+          request.url.queryParameters.containsKey('use_saved_preferences'),
+          isFalse,
+        );
+
+        return http.Response(
+          jsonEncode({'items': [], 'total': 0, 'limit': 20, 'offset': 0}),
+          200,
+        );
+      });
+
+      final apiClient = ApiClient(
+        apiConfig: const ApiConfig(),
+        tokenStorage: tokenStorage,
+        client: mockClient,
+      );
+      final service = JobService(apiClient: apiClient);
+
+      final response = await service.listJobs(useSavedPreferences: false);
+      expect(response.total, equals(0));
+    });
+
     test('getJob sends GET /jobs/{job_id}', () async {
       final mockClient = MockHttpClient((request) async {
         expect(request.url.path, equals('/jobs/job-123'));

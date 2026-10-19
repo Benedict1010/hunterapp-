@@ -13,6 +13,7 @@ class JobService {
     String? company,
     String? location,
     String? jobType,
+    bool? useSavedPreferences,
     int limit = 20,
     int offset = 0,
   }) async {
@@ -22,6 +23,7 @@ class JobService {
       if (company != null && company.isNotEmpty) 'company': company,
       if (location != null && location.isNotEmpty) 'location': location,
       if (jobType != null && jobType.isNotEmpty) 'job_type': jobType,
+      if (useSavedPreferences == true) 'use_saved_preferences': 'true',
     };
 
     final Uri uri = Uri(path: '/jobs', queryParameters: queryParams);

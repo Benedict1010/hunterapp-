@@ -39,11 +39,10 @@ class ResumeController extends ChangeNotifier {
   bool get hasError => _status == ResumeStateStatus.error;
 
   Resume? get primaryResume {
-    try {
-      return _resumes.firstWhere((r) => r.isPrimary);
-    } catch (_) {
-      return _resumes.isNotEmpty ? _resumes.first : null;
+    for (final r in _resumes) {
+      if (r.isPrimary) return r;
     }
+    return null;
   }
 
   void selectResume(Resume? resume) {

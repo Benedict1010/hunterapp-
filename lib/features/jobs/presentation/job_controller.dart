@@ -117,16 +117,13 @@ class JobController extends ChangeNotifier {
 
     try {
       final token = await jobService.apiClient.tokenStorage.getToken();
-      if (token == null || token.isEmpty) {
-        _status = JobStateStatus.loaded;
-        notifyListeners();
-        return;
-      }
+      final isSignedIn = token != null && token.isNotEmpty;
 
       final response = await jobService.listJobs(
         company: company,
         location: location,
         jobType: jobType,
+        useSavedPreferences: isSignedIn ? true : null,
         limit: limit,
         offset: offset,
       );
@@ -144,15 +141,29 @@ class JobController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadUserMatches() async {
+  Future<void> loadUserMatches({String? primaryResumeId}) async {
     try {
       final token = await jobService.apiClient.tokenStorage.getToken();
       if (token == null || token.isEmpty) {
+        _matchesByJobId.clear();
+        notifyListeners();
         return;
       }
       final matches = await jobService.listMatches();
-      for (final match in matches) {
-        _matchesByJobId[match.jobId] = match;
+      _matchesByJobId.clear();
+      if (primaryResumeId != null) {
+        for (final match in matches) {
+          if (match.resumeId == primaryResumeId) {
+            _matchesByJobId[match.jobId] = match;
+          }
+        }
+      } else {
+        for (final match in matches) {
+          _matchesByJobId[match.jobId] = match;
+        }
+      }
+      if (_selectedJob != null) {
+        _currentMatch = _matchesByJobId[_selectedJob!.id];
       }
       notifyListeners();
     } catch (_) {
@@ -200,6 +211,22 @@ class JobController extends ChangeNotifier {
     required String jobId,
     required String resumeId,
   }) async {
+    if (resumeId.isEmpty) {
+      _matchErrorMessage =
+          'A primary resume is required for match calculation.';
+      _matchStatus = MatchStateStatus.error;
+      notifyListeners();
+      return null;
+    }
+
+    final existingMatch = _matchesByJobId[jobId];
+    if (existingMatch != null && existingMatch.resumeId == resumeId) {
+      _currentMatch = existingMatch;
+      _matchStatus = MatchStateStatus.loaded;
+      notifyListeners();
+      return existingMatch;
+    }
+
     _matchStatus = MatchStateStatus.loading;
     _matchErrorMessage = null;
     notifyListeners();

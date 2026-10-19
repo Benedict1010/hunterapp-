@@ -12,6 +12,8 @@ import 'package:hunter/features/jobs/presentation/job_controller.dart';
 
 class FakeJobService implements JobService {
   bool shouldFail = false;
+  bool? lastUseSavedPreferences;
+  int createMatchCallCount = 0;
 
   @override
   final ApiClient apiClient = ApiClient(
@@ -60,9 +62,11 @@ class FakeJobService implements JobService {
     String? company,
     String? location,
     String? jobType,
+    bool? useSavedPreferences,
     int limit = 20,
     int offset = 0,
   }) async {
+    lastUseSavedPreferences = useSavedPreferences;
     if (shouldFail) {
       throw const ApiException(
         type: ApiErrorType.serverError,
@@ -95,6 +99,7 @@ class FakeJobService implements JobService {
     required String jobId,
     required String resumeId,
   }) async {
+    createMatchCallCount++;
     if (shouldFail) {
       throw const ApiException(
         type: ApiErrorType.badRequest,
@@ -102,7 +107,18 @@ class FakeJobService implements JobService {
         statusCode: 400,
       );
     }
-    return mockMatch;
+    return JobMatch(
+      id: 'm_$jobId',
+      userId: 'u1',
+      resumeId: resumeId,
+      jobId: jobId,
+      matchScore: mockMatch.matchScore,
+      matchedSkills: mockMatch.matchedSkills,
+      missingSkills: mockMatch.missingSkills,
+      explanation: mockMatch.explanation,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
   }
 
   @override
@@ -114,7 +130,20 @@ class FakeJobService implements JobService {
         statusCode: 500,
       );
     }
-    return [mockMatch];
+    return [
+      mockMatch,
+      JobMatch(
+        id: 'm2',
+        userId: 'u1',
+        resumeId: 'r2_non_primary',
+        jobId: 'job-2',
+        matchScore: 85.0,
+        matchedSkills: ['Dart'],
+        missingSkills: [],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
   }
 
   @override
@@ -235,6 +264,47 @@ void main() {
       expect(controller.tailoringStatus, TailoringStateStatus.loaded);
       expect(tailoring?.tailoredResume, 'Tailored Flutter resume');
       expect(controller.currentTailoring?.changesMade, ['Refined summary']);
+    });
+
+    test('signed-in loadJobs passes useSavedPreferences=true', () async {
+      await controller.loadJobs();
+      expect(fakeJobService.lastUseSavedPreferences, isTrue);
+    });
+
+    test('signed-out loadJobs passes useSavedPreferences=null', () async {
+      await fakeJobService.apiClient.tokenStorage.clearToken();
+      await controller.loadJobs();
+      expect(fakeJobService.lastUseSavedPreferences, isNull);
+    });
+
+    test('loadUserMatches filters matches by primaryResumeId', () async {
+      await controller.loadUserMatches(primaryResumeId: 'r1');
+      expect(controller.matchesByJobId.length, 1);
+      expect(controller.matchesByJobId['job-1']?.resumeId, 'r1');
+      expect(controller.matchesByJobId.containsKey('job-2'), isFalse);
+    });
+
+    test(
+      'calculateMatch avoids repeated backend calls for same job/resume pair',
+      () async {
+        await controller.calculateMatch(jobId: 'job-1', resumeId: 'r1');
+        expect(fakeJobService.createMatchCallCount, 1);
+
+        await controller.calculateMatch(jobId: 'job-1', resumeId: 'r1');
+        expect(fakeJobService.createMatchCallCount, 1);
+      },
+    );
+
+    test('calculateMatch fails when resumeId is empty', () async {
+      final result = await controller.calculateMatch(
+        jobId: 'job-1',
+        resumeId: '',
+      );
+      expect(result, isNull);
+      expect(
+        controller.matchErrorMessage,
+        contains('primary resume is required'),
+      );
     });
   });
 }

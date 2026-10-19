@@ -64,7 +64,7 @@ void main() {
     navigator.pushNamed('/job-detail');
     await tester.pumpAndSettle();
     expect(find.text('Software Engineer Intern'), findsOneWidget);
-    expect(find.text('AI Skill Analysis'), findsOneWidget);
+    expect(find.text('Primary Resume Required'), findsOneWidget);
 
     navigator.pushNamed('/optimization-ready');
     await tester.pumpAndSettle();

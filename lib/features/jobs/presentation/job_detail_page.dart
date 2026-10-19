@@ -266,7 +266,8 @@ class _JobDetailPageState extends State<JobDetailPage> {
                     child: SecondaryOutlinedButton(
                       label: 'Tailor Resume',
                       leading: const Icon(Icons.auto_awesome_outlined),
-                      onPressed: jobController?.isTailoring == true ||
+                      onPressed:
+                          jobController?.isTailoring == true ||
                               _isPreparingTailoring
                           ? null
                           : () => _tailorResume(
@@ -508,13 +509,13 @@ class _JobDetailPageState extends State<JobDetailPage> {
     final intendedTailoredVersion = tailoredResumeVersionId == null
         ? null
         : versions
-            .where(
-              (version) =>
-                  version.id == tailoredResumeVersionId &&
-                  version.versionType == 'tailored' &&
-                  version.jobId == job.id,
-            )
-            .firstOrNull;
+              .where(
+                (version) =>
+                    version.id == tailoredResumeVersionId &&
+                    version.versionType == 'tailored' &&
+                    version.jobId == job.id,
+              )
+              .firstOrNull;
     if (tailoredResumeVersionId != null && intendedTailoredVersion == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -526,10 +527,12 @@ class _JobDetailPageState extends State<JobDetailPage> {
       return;
     }
 
-    final resumeVersion = intendedTailoredVersion ?? versions.firstWhere(
-      (version) => version.versionType == 'original',
-      orElse: () => versions.first,
-    );
+    final resumeVersion =
+        intendedTailoredVersion ??
+        versions.firstWhere(
+          (version) => version.versionType == 'original',
+          orElse: () => versions.first,
+        );
 
     final app = await applicationController.createApplication(
       jobId: job.id,
@@ -559,7 +562,42 @@ class _JobDetailPageState extends State<JobDetailPage> {
     required String? primaryResumeId,
     required JobMatch? match,
   }) {
-    if (match != null) {
+    if (primaryResumeId == null) {
+      return AppSurface(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.primary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Primary Resume Required',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Upload or select a primary resume to calculate your personalized match score.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.resumeVerified),
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: const Text('Manage Resumes'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (match != null && match.resumeId == primaryResumeId) {
       return MatchScoreCard(
         score: match.score,
         label: 'AI Skill Analysis',
@@ -569,23 +607,76 @@ class _JobDetailPageState extends State<JobDetailPage> {
       );
     }
 
-    if (primaryResumeId == null) {
-      return const MatchScoreCard(
-        score: 94,
-        label: 'AI Skill Analysis',
-        message:
-            'Upload a resume to see your personalized match score and skill analysis.',
+    if (jobController != null && jobController.isCalculatingMatch) {
+      return const AppSurface(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: AppSpacing.sm),
+            Text('Calculating personalized match...'),
+          ],
+        ),
+      );
+    }
+
+    if (jobController != null && jobController.matchErrorMessage != null) {
+      return AppSurface(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              jobController.matchErrorMessage!,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            OutlinedButton.icon(
+              onPressed: () => jobController.calculateMatch(
+                jobId: job.id,
+                resumeId: primaryResumeId,
+              ),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Retry Match Calculation'),
+            ),
+          ],
+        ),
       );
     }
 
     return AppSurface(
-      child: OutlinedButton.icon(
-        onPressed: () => jobController?.calculateMatch(
-          jobId: job.id,
-          resumeId: primaryResumeId,
-        ),
-        icon: const Icon(Icons.analytics_outlined),
-        label: const Text('Calculate Skill Match'),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No Match Score Yet',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Calculate match score against your primary resume.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => jobController?.calculateMatch(
+              jobId: job.id,
+              resumeId: primaryResumeId,
+            ),
+            icon: const Icon(Icons.analytics_outlined),
+            label: const Text('Calculate'),
+          ),
+        ],
       ),
     );
   }
