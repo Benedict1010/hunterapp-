@@ -3,6 +3,7 @@ import '../domain/ai_analysis.dart';
 import '../domain/ai_tailoring.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
+import '../domain/job_view.dart';
 
 class JobService {
   final ApiClient apiClient;
@@ -34,6 +35,18 @@ class JobService {
   Future<Job> getJob(String jobId) async {
     final response = await apiClient.get('/jobs/$jobId');
     return Job.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<List<JobView>> listViewedJobs() async {
+    final response = await apiClient.get('/jobs/viewed');
+    return (response as List<dynamic>)
+        .map((json) => JobView.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<JobView> recordJobView(String jobId) async {
+    final response = await apiClient.post('/jobs/$jobId/view');
+    return JobView.fromJson(response as Map<String, dynamic>);
   }
 
   Future<JobMatch> createOrGetMatch({

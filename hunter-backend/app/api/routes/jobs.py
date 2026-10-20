@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
-from app.core.security import get_optional_user
-from app.models.job import Job
+from app.core.security import get_current_user, get_optional_user
+from app.models.job import Job, UserJobView
 from app.models.user import JobPreference, User, UserJobSource
-from app.schemas.job import IngestionSummary, JobListResponse, JobRead, JobSkillRead
+from app.schemas.job import IngestionSummary, JobListResponse, JobRead, JobSkillRead, JobViewRead
 from app.services.job_ingestion import JobIngestionService
 from app.services.job_sources.mock import MockJobSource, MockPartnerJobSource
 
@@ -115,6 +116,62 @@ def ingest_mock_jobs(database: Session = Depends(get_db)) -> IngestionSummary:
         for key, value in summary.__dict__.items():
             combined[key] += value
     return IngestionSummary(**combined)
+
+
+@router.get("/viewed", response_model=list[JobViewRead])
+def list_viewed_jobs(
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> list[UserJobView]:
+    return list(
+        database.scalars(
+            select(UserJobView)
+            .where(UserJobView.user_id == current_user.id)
+            .order_by(UserJobView.created_at.desc(), UserJobView.id.desc())
+        )
+    )
+
+
+@router.post("/{job_id}/view", response_model=JobViewRead, status_code=status.HTTP_200_OK)
+def record_job_view(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    database: Session = Depends(get_db),
+) -> UserJobView:
+    job = database.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    existing_view = database.scalar(
+        select(UserJobView).where(
+            UserJobView.user_id == current_user.id,
+            UserJobView.job_id == job_id,
+        )
+    )
+    if existing_view is not None:
+        return existing_view
+
+    job_view = UserJobView(user_id=current_user.id, job_id=job_id)
+    try:
+        # A savepoint lets us recover from the unique constraint race without
+        # poisoning the request session's enclosing transaction.
+        with database.begin_nested():
+            database.add(job_view)
+            database.flush()
+    except IntegrityError:
+        job_view = database.scalar(
+            select(UserJobView).where(
+                UserJobView.user_id == current_user.id,
+                UserJobView.job_id == job_id,
+            )
+        )
+        if job_view is None:
+            raise
+        return job_view
+
+    database.commit()
+    database.refresh(job_view)
+    return job_view
 
 
 @router.get("/{job_id}", response_model=JobRead)

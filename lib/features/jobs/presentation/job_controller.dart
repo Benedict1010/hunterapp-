@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -7,6 +9,7 @@ import '../domain/ai_analysis.dart';
 import '../domain/ai_tailoring.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
+import '../domain/job_view.dart';
 
 enum JobStateStatus { initial, loading, loaded, error }
 
@@ -34,6 +37,11 @@ class JobController extends ChangeNotifier {
   AiAnalysis? _currentAnalysis;
   AiTailoring? _currentTailoring;
   final Map<String, JobMatch> _matchesByJobId = {};
+  final Set<String> _viewedJobIds = {};
+  final Set<String> _viewRecordingJobIds = {};
+  Future<void>? _viewedJobsLoadFuture;
+  String? _viewedJobsToken;
+  bool _hasLoadedViewedJobs = false;
 
   String? _errorMessage;
   String? _matchErrorMessage;
@@ -66,6 +74,7 @@ class JobController extends ChangeNotifier {
   AiAnalysis? get currentAnalysis => _currentAnalysis;
   AiTailoring? get currentTailoring => _currentTailoring;
   Map<String, JobMatch> get matchesByJobId => Map.unmodifiable(_matchesByJobId);
+  bool isJobViewed(String jobId) => _viewedJobIds.contains(jobId);
 
   String? get errorMessage => _errorMessage;
   String? get matchErrorMessage => _matchErrorMessage;
@@ -177,22 +186,14 @@ class JobController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await jobService.apiClient.tokenStorage.getToken();
-      if (token == null || token.isEmpty) {
-        final matches = _jobs.where((j) => j.id == jobId);
-        _selectedJob = matches.isNotEmpty
-            ? matches.first
-            : softwareEngineerIntern;
-        _detailStatus = JobDetailStatus.loaded;
-        notifyListeners();
-        return _selectedJob;
-      }
-
       final job = await jobService.getJob(jobId);
       _selectedJob = job;
       _currentMatch = _matchesByJobId[jobId];
       _detailStatus = JobDetailStatus.loaded;
       notifyListeners();
+      // View tracking is best-effort: it must not delay or invalidate job
+      // details, matching, or external application actions.
+      unawaited(_loadAndRecordJobView(job.id));
       return job;
     } on ApiException catch (e) {
       _errorMessage = e.userFriendlyMessage;
@@ -204,6 +205,74 @@ class JobController extends ChangeNotifier {
       _detailStatus = JobDetailStatus.error;
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<void> loadViewedJobs() async {
+    final token = await jobService.apiClient.tokenStorage.getToken();
+    if (token == null || token.isEmpty) {
+      if (_viewedJobsToken != null || _viewedJobIds.isNotEmpty) {
+        _viewedJobsToken = null;
+        _viewedJobIds.clear();
+        _hasLoadedViewedJobs = false;
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (_viewedJobsToken != token) {
+      _viewedJobsToken = token;
+      _viewedJobIds.clear();
+      _hasLoadedViewedJobs = false;
+      _viewedJobsLoadFuture = null;
+    }
+    if (_hasLoadedViewedJobs) return;
+    final inFlightLoad = _viewedJobsLoadFuture;
+    if (inFlightLoad != null) return inFlightLoad;
+
+    late final Future<void> loadFuture;
+    loadFuture = _fetchViewedJobs().whenComplete(() {
+      if (identical(_viewedJobsLoadFuture, loadFuture)) {
+        _viewedJobsLoadFuture = null;
+      }
+    });
+    _viewedJobsLoadFuture = loadFuture;
+    return loadFuture;
+  }
+
+  Future<void> _fetchViewedJobs() async {
+    try {
+      final views = await jobService.listViewedJobs();
+      _viewedJobIds
+        ..clear()
+        ..addAll(views.map((view) => view.jobId));
+      _hasLoadedViewedJobs = true;
+      notifyListeners();
+    } catch (_) {
+      // A later detail visit can retry loading persisted view state.
+    }
+  }
+
+  Future<void> recordJobView(String jobId) async {
+    final token = await jobService.apiClient.tokenStorage.getToken();
+    if (token == null || token.isEmpty || isJobViewed(jobId)) return;
+    if (!_viewRecordingJobIds.add(jobId)) return;
+
+    try {
+      final view = await jobService.recordJobView(jobId);
+      _viewedJobIds.add(view.jobId);
+      notifyListeners();
+    } catch (_) {
+      // Do not mark locally on failure so the next detail visit can retry.
+    } finally {
+      _viewRecordingJobIds.remove(jobId);
+    }
+  }
+
+  Future<void> _loadAndRecordJobView(String jobId) async {
+    await loadViewedJobs();
+    if (!isJobViewed(jobId)) {
+      await recordJobView(jobId);
     }
   }
 

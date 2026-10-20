@@ -143,6 +143,39 @@ void main() {
       expect(job.title, equals('Dart Developer'));
     });
 
+    test('job view requests use the dedicated endpoints', () async {
+      var requestCount = 0;
+      final mockClient = MockHttpClient((request) async {
+        requestCount++;
+        if (request.method == 'GET') {
+          expect(request.url.path, '/jobs/viewed');
+          return http.Response(jsonEncode([]), 200);
+        }
+        expect(request.method, 'POST');
+        expect(request.url.path, '/jobs/job-123/view');
+        return http.Response(
+          jsonEncode({
+            'id': 'view-1',
+            'user_id': 'user-1',
+            'job_id': 'job-123',
+            'created_at': '2026-10-20T10:00:00Z',
+          }),
+          200,
+        );
+      });
+      final service = JobService(
+        apiClient: ApiClient(
+          apiConfig: const ApiConfig(),
+          tokenStorage: tokenStorage,
+          client: mockClient,
+        ),
+      );
+
+      expect(await service.listViewedJobs(), isEmpty);
+      expect((await service.recordJobView('job-123')).jobId, 'job-123');
+      expect(requestCount, 2);
+    });
+
     test('createOrGetMatch sends POST /matches/jobs/{job_id}', () async {
       final mockClient = MockHttpClient((request) async {
         expect(request.method, equals('POST'));

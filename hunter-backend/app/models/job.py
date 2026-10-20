@@ -45,6 +45,9 @@ class Job(Base):
     skills: Mapped[list["JobSkill"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    views: Mapped[list["UserJobView"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
 
 
 class JobSkill(Base):
@@ -55,3 +58,24 @@ class JobSkill(Base):
     name: Mapped[str] = mapped_column(String(100))
     importance: Mapped[float | None] = mapped_column(Float, nullable=True)
     job: Mapped[Job] = relationship(back_populates="skills")
+
+
+class UserJobView(Base):
+    __tablename__ = "user_job_views"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_views_user_job"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="job_views")
+    job: Mapped[Job] = relationship(back_populates="views")

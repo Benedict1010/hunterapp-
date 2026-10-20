@@ -8,12 +8,17 @@ import 'package:hunter/features/jobs/domain/ai_analysis.dart';
 import 'package:hunter/features/jobs/domain/ai_tailoring.dart';
 import 'package:hunter/features/jobs/domain/job.dart';
 import 'package:hunter/features/jobs/domain/job_match.dart';
+import 'package:hunter/features/jobs/domain/job_view.dart';
 import 'package:hunter/features/jobs/presentation/job_controller.dart';
 
 class FakeJobService implements JobService {
   bool shouldFail = false;
   bool? lastUseSavedPreferences;
   int createMatchCallCount = 0;
+  int listViewedJobsCallCount = 0;
+  int recordJobViewCallCount = 0;
+  bool shouldFailViewRequest = false;
+  List<JobView> persistedViews = [];
 
   @override
   final ApiClient apiClient = ApiClient(
@@ -92,6 +97,32 @@ class FakeJobService implements JobService {
       );
     }
     return mockJobs.firstWhere((j) => j.id == jobId);
+  }
+
+  @override
+  Future<List<JobView>> listViewedJobs() async {
+    listViewedJobsCallCount++;
+    return persistedViews;
+  }
+
+  @override
+  Future<JobView> recordJobView(String jobId) async {
+    recordJobViewCallCount++;
+    if (shouldFailViewRequest) {
+      throw const ApiException(
+        type: ApiErrorType.serverError,
+        message: 'View recording failed',
+        statusCode: 500,
+      );
+    }
+    final view = JobView(
+      id: 'view-$jobId',
+      userId: 'u1',
+      jobId: jobId,
+      createdAt: DateTime.now(),
+    );
+    persistedViews = [...persistedViews, view];
+    return view;
   }
 
   @override
@@ -230,6 +261,55 @@ void main() {
       expect(job, isNotNull);
       expect(job?.id, 'job-1');
       expect(controller.selectedJob?.title, 'Flutter Engineer');
+    });
+
+    test('loads persisted views once and does not re-record them', () async {
+      fakeJobService.persistedViews = [
+        JobView(
+          id: 'view-job-1',
+          userId: 'u1',
+          jobId: 'job-1',
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      await controller.loadViewedJobs();
+      await controller.loadViewedJobs();
+      await controller.recordJobView('job-1');
+
+      expect(controller.isJobViewed('job-1'), isTrue);
+      expect(fakeJobService.listViewedJobsCallCount, 1);
+      expect(fakeJobService.recordJobViewCallCount, 0);
+    });
+
+    test('failed view recording remains retryable', () async {
+      fakeJobService.shouldFailViewRequest = true;
+      await controller.recordJobView('job-1');
+      expect(controller.isJobViewed('job-1'), isFalse);
+
+      fakeJobService.shouldFailViewRequest = false;
+      await controller.recordJobView('job-1');
+      expect(controller.isJobViewed('job-1'), isTrue);
+      expect(fakeJobService.recordJobViewCallCount, 2);
+    });
+
+    test('signed-out users do not create view records', () async {
+      await fakeJobService.apiClient.tokenStorage.clearToken();
+      await controller.recordJobView('job-1');
+      expect(fakeJobService.recordJobViewCallCount, 0);
+      expect(controller.isJobViewed('job-1'), isFalse);
+    });
+
+    test('view tracking failure does not block details or match calculation', () async {
+      fakeJobService.shouldFailViewRequest = true;
+      final job = await controller.loadJobDetail('job-1');
+      await Future<void>.delayed(Duration.zero);
+
+      final match = await controller.calculateMatch(jobId: 'job-1', resumeId: 'r1');
+      expect(job?.id, 'job-1');
+      expect(controller.detailStatus, JobDetailStatus.loaded);
+      expect(match, isNotNull);
+      expect(controller.isJobViewed('job-1'), isFalse);
     });
 
     test('calculateMatch sets currentMatch', () async {

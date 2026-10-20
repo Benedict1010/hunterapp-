@@ -32,6 +32,9 @@ class User(Base):
     job_sources: Mapped[list["UserJobSource"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    job_views: Mapped[list["UserJobView"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class JobPreference(Base):
