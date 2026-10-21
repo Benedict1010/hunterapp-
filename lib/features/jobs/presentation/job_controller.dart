@@ -9,7 +9,6 @@ import '../domain/ai_analysis.dart';
 import '../domain/ai_tailoring.dart';
 import '../domain/job.dart';
 import '../domain/job_match.dart';
-import '../domain/job_view.dart';
 
 enum JobStateStatus { initial, loading, loaded, error }
 

@@ -62,6 +62,7 @@ class _JobDetailPageState extends State<JobDetailPage> {
       });
     } else if (jobController.selectedJob != null) {
       final job = jobController.selectedJob!;
+      jobController.recordJobView(job.id);
       final primaryResume = resumeController?.primaryResume;
       if (primaryResume != null && jobController.currentMatch == null) {
         jobController.calculateMatch(jobId: job.id, resumeId: primaryResume.id);

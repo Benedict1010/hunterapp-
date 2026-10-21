@@ -113,3 +113,10 @@ def test_job_view_recovers_from_a_concurrent_unique_constraint_conflict(client, 
     assert database.query(UserJobView).filter_by(user_id=user.id, job_id=job.id).count() == 1
     # The savepoint rollback keeps the caller's session usable.
     assert database.query(Job).filter_by(id=job.id).one().id == job.id
+
+
+def test_job_view_returns_404_for_invalid_job_id(client, database):
+    headers = _headers_for(client, "view-404@example.com")
+    res = client.post("/jobs/nonexistent-job-id/view", headers=headers)
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Job not found"
