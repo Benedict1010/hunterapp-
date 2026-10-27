@@ -64,7 +64,7 @@ class _AiJobHunterAppState extends State<AiJobHunterApp> {
   @override
   void initState() {
     super.initState();
-    final tokenStorage = FileTokenStorage();
+    final tokenStorage = SecureTokenStorage(legacyStorage: FileTokenStorage());
     final apiClient = ApiClient(
       apiConfig: const ApiConfig(),
       tokenStorage: tokenStorage,
