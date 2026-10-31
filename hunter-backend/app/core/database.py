@@ -10,7 +10,11 @@ def _connect_args(database_url: str) -> dict[str, object]:
     return {"check_same_thread": False} if database_url.startswith("sqlite") else {}
 
 
-engine = create_engine(settings.database_url, connect_args=_connect_args(settings.database_url))
+engine = create_engine(
+    settings.database_url,
+    connect_args=_connect_args(settings.database_url),
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
